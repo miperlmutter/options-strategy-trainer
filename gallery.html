@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Gallery — verification · Options Strategy Trainer</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="tick">▲▼</span> Options Strategy Trainer</div>
+    <span class="spacer"></span>
+    <a href="index.html">← Back to app</a>
+  </div>
+
+  <div class="wrap">
+    <h1>Strategy Gallery</h1>
+    <p class="sub">Verification surface — every strategy's computed payoff, max P/L, break-evens and legs.
+       This page is for spot-checking <span class="mono">js/strategies.js</span> and the payoff engine; it is not a game mode.</p>
+    <div id="gallery"></div>
+  </div>
+
+  <script src="js/payoff.js"></script>
+  <script src="js/strategies.js"></script>
+  <script>
+    (function () {
+      var SPOT = Payoff.SPOT;
+      var CATS = StrategyLib.CATEGORIES;
+      var LABELS = StrategyLib.CATEGORY_LABELS;
+      var root = document.getElementById('gallery');
+
+      function legStr(leg) {
+        var sign = leg.action === 'buy' ? '+' : '−';
+        var cls = leg.action === 'buy' ? 'buy' : 'sell';
+        var qty = leg.qty || 1;
+        if (leg.type === 'stock') {
+          return '<span class="' + cls + '">' + sign + qty + ' Stock @ $' + SPOT + '</span>';
+        }
+        var k = SPOT + (leg.strike || 0);
+        var typ = leg.type === 'call' ? 'Call' : 'Put';
+        var exp = leg.expiry === 'far' ? ' (far)' : '';
+        return '<span class="' + cls + '">' + sign + qty + ' ' + typ + ' $' + k + exp + '</span>';
+      }
+
+      function card(s) {
+        var d = document.createElement('div');
+        d.className = 'card';
+
+        var tierCls = s.tier === 'Beginner' ? 'beginner' : (s.tier === 'Intermediate' ? 'intermediate' : 'advanced-tier');
+        var head = '<div class="card-head"><span class="name">' + s.name + '</span>' +
+                   '<span class="pill ' + s.category + '">' + s.category + '</span></div>' +
+                   '<div class="tags">' +
+                     '<span class="pill ' + tierCls + '">' + s.tier + '</span>' +
+                     '<span class="pill">' + s.priceOutlook + '</span>' +
+                     '<span class="pill">' + s.volOutlook + '</span>' +
+                   '</div>';
+        d.innerHTML = head;
+
+        d.appendChild(Payoff.renderSVG(s.legs, { width: 460, height: 240 }));
+
+        var g = s.greeks;
+        var metrics = document.createElement('div');
+        metrics.className = 'metrics';
+        metrics.innerHTML = Payoff.metricsTableHTML(s.legs) +
+          '<span class="k">Greeks (Δ/Γ/Θ/V)</span><span class="v">' +
+              g.delta + ' / ' + g.gamma + ' / ' + g.theta + ' / ' + g.vega + '</span>';
+        d.appendChild(metrics);
+
+        var legs = document.createElement('div');
+        legs.className = 'legs';
+        legs.innerHTML = s.legs.map(legStr).join('<br>');
+        d.appendChild(legs);
+
+        return d;
+      }
+
+      CATS.forEach(function (cat) {
+        var items = StrategyLib.all().filter(function (s) { return s.category === cat; });
+        if (!items.length) return;
+        var h = document.createElement('h2');
+        h.textContent = LABELS[cat] + '  (' + items.length + ')';
+        root.appendChild(h);
+        var grid = document.createElement('div');
+        grid.className = 'grid';
+        items.forEach(function (s) { grid.appendChild(card(s)); });
+        root.appendChild(grid);
+      });
+
+      var total = document.createElement('p');
+      total.className = 'sub';
+      total.style.marginTop = '28px';
+      total.textContent = StrategyLib.all().length + ' strategies loaded (time-based strategies pending design).';
+      root.appendChild(total);
+    })();
+  </script>
+</body>
+</html>
