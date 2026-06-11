@@ -200,11 +200,7 @@
       profitPotential: 'limited', risk: 'limited',
       greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'short' },
       aka: ['iron condor', 'condor', 'ic'],
-      blurb: 'Sell an OTM put spread and an OTM call spread. Profits in a wide range while the underlying stays between the short strikes; risk capped by the wings.',
-      components: [
-        [ { action: 'buy', type: 'put', strike: -15, qty: 1, expiry: 'near' }, { action: 'sell', type: 'put', strike: -5, qty: 1, expiry: 'near' } ],
-        [ { action: 'sell', type: 'call', strike: 5, qty: 1, expiry: 'near' }, { action: 'buy', type: 'call', strike: 15, qty: 1, expiry: 'near' } ]
-      ]
+      blurb: 'Sell an OTM put spread and an OTM call spread. Profits in a wide range while the underlying stays between the short strikes; risk capped by the wings.'
     },
     {
       id: 'iron-butterfly', name: 'Iron Butterfly', category: 'vol', tier: 'Advanced',
@@ -218,11 +214,7 @@
       profitPotential: 'limited', risk: 'limited',
       greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'short' },
       aka: ['iron butterfly', 'iron fly', 'ironfly'],
-      blurb: 'A short straddle bracketed by long wings. Higher credit and a sharper profit peak than an iron condor, but a narrower profit zone; risk is capped.',
-      components: [
-        [ { action: 'buy', type: 'put', strike: -10, qty: 1, expiry: 'near' }, { action: 'sell', type: 'put', strike: 0, qty: 1, expiry: 'near' } ],
-        [ { action: 'sell', type: 'call', strike: 0, qty: 1, expiry: 'near' }, { action: 'buy', type: 'call', strike: 10, qty: 1, expiry: 'near' } ]
-      ]
+      blurb: 'A short straddle bracketed by long wings. Higher credit and a sharper profit peak than an iron condor, but a narrower profit zone; risk is capped.'
     },
 
     /* ---------------- ADVANCED (price/structure, non-time) ---------------- */
@@ -237,11 +229,7 @@
       profitPotential: 'limited', risk: 'limited',
       greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'short' },
       aka: ['butterfly', 'call butterfly', 'long butterfly', 'long call butterfly'],
-      blurb: 'Buy one ITM call, sell two ATM calls, buy one OTM call. A cheap, defined-risk bet that the underlying pins the middle strike at expiration.',
-      components: [
-        [ { action: 'buy', type: 'call', strike: -10, qty: 1, expiry: 'near' }, { action: 'sell', type: 'call', strike: 0, qty: 1, expiry: 'near' } ],
-        [ { action: 'sell', type: 'call', strike: 0, qty: 1, expiry: 'near' }, { action: 'buy', type: 'call', strike: 10, qty: 1, expiry: 'near' } ]
-      ]
+      blurb: 'Buy one ITM call, sell two ATM calls, buy one OTM call. A cheap, defined-risk bet that the underlying pins the middle strike at expiration.'
     },
     {
       id: 'broken-wing-butterfly', name: 'Broken-Wing Butterfly', category: 'advanced', tier: 'Advanced',
@@ -254,11 +242,7 @@
       profitPotential: 'limited', risk: 'limited',
       greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'short' },
       aka: ['broken wing butterfly', 'bwb', 'broken-wing butterfly', 'skip strike butterfly'],
-      blurb: 'A butterfly with one wing pushed further out, skewing the risk. Often opened for a credit so one side carries no loss — the cost is more risk on the other.',
-      components: [
-        [ { action: 'buy', type: 'call', strike: -10, qty: 1, expiry: 'near' }, { action: 'sell', type: 'call', strike: 0, qty: 1, expiry: 'near' } ],
-        [ { action: 'sell', type: 'call', strike: 0, qty: 1, expiry: 'near' }, { action: 'buy', type: 'call', strike: 15, qty: 1, expiry: 'near' } ]
-      ]
+      blurb: 'A butterfly with one wing pushed further out, skewing the risk. Often opened for a credit so one side carries no loss — the cost is more risk on the other.'
     },
     {
       id: 'call-ratio-spread', name: 'Call Ratio Spread', category: 'advanced', tier: 'Advanced',
@@ -296,11 +280,7 @@
       profitPotential: 'limited', risk: 'limited',
       greeks: { delta: 'long', gamma: 'short', theta: 'long', vega: 'short' },
       aka: ['jade lizard'],
-      blurb: 'A short put plus a short call spread, sized so the total credit covers the call-spread width — leaving NO risk to the upside. All the risk is to the downside, like a short put.',
-      components: [
-        [ { action: 'sell', type: 'put', strike: -5, qty: 1, expiry: 'near' } ],
-        [ { action: 'sell', type: 'call', strike: 5, qty: 1, expiry: 'near' }, { action: 'buy', type: 'call', strike: 10, qty: 1, expiry: 'near' } ]
-      ]
+      blurb: 'A short put plus a short call spread, sized so the total credit covers the call-spread width — leaving NO risk to the upside. All the risk is to the downside, like a short put.'
     },
     {
       id: 'call-backspread', name: 'Call Backspread', category: 'advanced', tier: 'Advanced',

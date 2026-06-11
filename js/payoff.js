@@ -210,6 +210,18 @@
       pts.push({ s: s, pl: pl });
       if (pl > yMax) yMax = pl; if (pl < yMin) yMin = pl;
     }
+    // Pre-sample component lines and include them in the y-range, so a flat net
+    // (e.g. a box) still shows its sloped underlying spreads in-frame.
+    var compFns = opts._componentFns || [];
+    var compVals = compFns.map(function (fn) {
+      var arr = [];
+      for (var ci = 0; ci <= n; ci++) {
+        var cv = fn(dom.lo + (dom.hi - dom.lo) * ci / n);
+        arr.push(cv);
+        if (cv > yMax) yMax = cv; if (cv < yMin) yMin = cv;
+      }
+      return arr;
+    });
     yMax = Math.max(yMax, 0); yMin = Math.min(yMin, 0);
     var span = (yMax - yMin) || 1;
     yMax += span * 0.12; yMin -= span * 0.12;
@@ -242,21 +254,18 @@
       svg.appendChild(el('line', { x1: sx(spot), y1: pad.t, x2: sx(spot), y2: pad.t + plotH, class: 'spot-line' }));
     }
 
-    // dotted component lines (the "parts" that sum to the net payoff).
-    // Clipped to the plot area so a leg that runs past the net range doesn't overflow.
-    var compFns = opts._componentFns || [];
-    if (compFns.length) {
+    // dotted component lines (the "parts" that sum to the net payoff), clipped to the plot.
+    if (compVals.length) {
       var clipId = 'ppclip' + (++_uid);
       var defs = el('defs', {});
       var cp = el('clipPath', { id: clipId });
       cp.appendChild(el('rect', { x: pad.l, y: pad.t, width: plotW, height: plotH }));
       defs.appendChild(cp);
       svg.appendChild(defs);
-      compFns.forEach(function (fn) {
+      compVals.forEach(function (arr) {
         var cd = '';
         for (var ci = 0; ci <= n; ci++) {
-          var cs = dom.lo + (dom.hi - dom.lo) * ci / n;
-          cd += (ci ? ' L' : 'M') + sx(cs) + ',' + sy(fn(cs));
+          cd += (ci ? ' L' : 'M') + sx(dom.lo + (dom.hi - dom.lo) * ci / n) + ',' + sy(arr[ci]);
         }
         svg.appendChild(el('path', { d: cd, class: 'payoff-component', 'clip-path': 'url(#' + clipId + ')' }));
       });
@@ -286,18 +295,13 @@
   function addText(svg, el, x, y, str, cls) { var t = el('text', { x: x, y: y, class: cls }); t.textContent = str; svg.appendChild(t); }
   function fmtY(v) { var d = v * CONTRACT; if (Math.abs(d) >= 1000) return (d / 1000).toFixed(1) + 'k'; return d.toFixed(0); }
 
-  // Default decomposition: one component per leg (skipped for single-leg strategies).
-  function perLegComponents(legs) {
-    return legs.length > 1 ? legs.map(function (l) { return [l]; }) : [];
-  }
-
-  // RELATIVE renderer (library + games). opts.components = array of leg-arrays
-  // to draw as dotted "parts"; omit for the per-leg default, or pass [] to suppress.
+  // RELATIVE renderer (library + games). Dotted "parts" lines are drawn ONLY when
+  // opts.components (an array of leg-arrays) is supplied — there is no per-leg default.
   function renderSVG(legs, opts) {
     opts = opts || {};
     var dom = displayDomain(legs);
     var m = computeMetrics(legs, { hi: dom.hi });
-    var comps = (opts.components !== undefined) ? opts.components : perLegComponents(legs);
+    var comps = opts.components || [];
     opts._componentFns = comps.map(function (cl) { return function (s) { return payoffAt(cl, s); }; });
     return drawCurve(function (s) { return payoffAt(legs, s); }, dom, m.breakEvens, SPOT, opts);
   }
@@ -309,13 +313,11 @@
     return renderSVG(strategy.legs, opts);
   }
 
-  // ABSOLUTE renderer (sandbox) — per-leg components.
+  // ABSOLUTE renderer (sandbox) — net line only (no component decomposition).
   function renderCustom(legs, spot, opts) {
     opts = opts || {};
     var dom = domainAbs(legs, spot);
     var m = computeMetricsAbs(legs, spot);
-    var comps = (opts.components !== undefined) ? opts.components : perLegComponents(legs);
-    opts._componentFns = comps.map(function (cl) { return function (s) { return payoffAtAbs(cl, s); }; });
     return drawCurve(function (s) { return payoffAtAbs(legs, s); }, dom, m.breakEvens, spot, opts);
   }
 
