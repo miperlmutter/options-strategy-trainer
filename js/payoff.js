@@ -33,7 +33,11 @@
    *
    * Tunable below. Teaching values, not market quotes.
    * -------------------------------------------------------- */
-  var PREMIUM = { atmTvNear: 5.0, atmTvFar: 8.0, width: 18 };
+  var PREMIUM = {
+    atmTvNear: 5.0, atmTvFar: 8.0, width: 18,
+    resWidth: 9   // narrower curve for far-leg RESIDUAL value at the near expiry,
+                  // so calendar tents stay peaked and double-calendar humps separate
+  };
 
   function intrinsic(type, strike, S) {
     if (type === 'call') return Math.max(S - strike, 0);
@@ -306,11 +310,12 @@
     return drawCurve(function (s) { return payoffAt(legs, s); }, dom, m.breakEvens, SPOT, opts);
   }
 
-  // Render a full strategy object, using its logical `components` if defined.
+  // Render a full strategy object: logical components if defined, and the
+  // near-expiry model for time-based strategies (calendars/diagonals/doubles).
   function renderStrategy(strategy, opts) {
     opts = opts || {};
     if (strategy.components && opts.components === undefined) opts.components = strategy.components;
-    return renderSVG(strategy.legs, opts);
+    return strategy.timeBased ? renderTimeBased(strategy.legs, opts) : renderSVG(strategy.legs, opts);
   }
 
   // ABSOLUTE renderer (sandbox) — net line only (no component decomposition).
@@ -381,12 +386,91 @@
   }
   function row(k, v) { return '<span class="k">' + k + '</span><span class="v">' + v + '</span>'; }
 
+  /* ----------------------------------------------------------
+   * TIME-BASED engine — calendars/diagonals/doubles span two expiries.
+   * Valued AT THE NEAR expiry: near legs expire to intrinsic; far legs keep
+   * residual time value (one period remaining ≈ atmTvNear, centered on
+   * moneyness S−K). A teaching approximation — NOT Black-Scholes.
+   * -------------------------------------------------------- */
+  function valueAtNearExpiry(leg, S) {
+    if (leg.type === 'stock') return S;
+    var K = legStrike(leg);
+    var intr = intrinsic(leg.type, K, S);
+    if (leg.expiry === 'far') {
+      var d = (S - K) / PREMIUM.resWidth;
+      return intr + PREMIUM.atmTvNear * Math.exp(-0.5 * d * d);
+    }
+    return intr;
+  }
+  function payoffAtNearExpiry(legs, S) {
+    var total = 0;
+    for (var i = 0; i < legs.length; i++) {
+      var leg = legs[i], dir = (leg.action === 'buy') ? 1 : -1, qty = leg.qty || 1;
+      if (leg.type === 'stock') { total += dir * qty * (S - SPOT); continue; }
+      var entry = premium(leg.type, legStrike(leg), leg.expiry);
+      total += dir * qty * (valueAtNearExpiry(leg, S) - entry);
+    }
+    return total;
+  }
+  function hasFarLeg(legs) {
+    for (var i = 0; i < legs.length; i++) if (legs[i].expiry === 'far') return true;
+    return false;
+  }
+  function computeMetricsTime(legs) {
+    var kinks = legs.filter(function (l) { return l.type !== 'stock'; }).map(legStrike);
+    // sample wide so the far leg's residual time value fully decays (bounded risk)
+    var m = solveMetrics(function (s) { return payoffAtNearExpiry(legs, s); }, kinks, 0, SPOT * 3);
+    m.netDebit = netDebit(legs);
+    return m;
+  }
+  function describeMetricsTime(legs) {
+    var m = computeMetricsTime(legs);
+    return {
+      maxProfit: m.profitUnlimited ? 'Unlimited' : moneyC(m.maxProfit),
+      maxLoss: m.lossUnlimited ? 'Unlimited' : moneyC(m.maxLoss),
+      breakEvens: m.breakEvens.map(function (b) { return '$' + b.toFixed(2); }),
+      net: (m.netDebit >= 0 ? 'Debit $' : 'Credit $') + Math.abs(m.netDebit * CONTRACT).toFixed(0)
+    };
+  }
+  function renderTimeBased(legs, opts) {
+    opts = opts || {};
+    var dom = displayDomain(legs);
+    var m = computeMetricsTime(legs);
+    opts._componentFns = (opts.components || []).map(function (cl) { return function (s) { return payoffAtNearExpiry(cl, s); }; });
+    return drawCurve(function (s) { return payoffAtNearExpiry(legs, s); }, dom, m.breakEvens, SPOT, opts);
+  }
+  function metricsTableHTMLTime(legs) {
+    var m = describeMetricsTime(legs);
+    var rows = '';
+    rows += row('Stock price', '$' + SPOT + ' <span class="dim">(notional spot)</span>');
+    legs.forEach(function (leg) {
+      if (leg.type === 'stock') { rows += row(legPriceLabel(leg), '$' + SPOT + ' <span class="dim">basis</span>'); return; }
+      var p = premium(leg.type, legStrike(leg), leg.expiry);
+      var exp = '<span class="dim"> ' + (leg.expiry === 'far' ? 'far' : 'near') + '</span>';
+      rows += row(legPriceLabel(leg) + exp, 'prem $' + p.toFixed(2) + '<span class="dim">/sh</span>');
+    });
+    rows += row('Net', m.net);
+    rows += row('Max profit', '<span class="profit">' + m.maxProfit + '</span> <span class="dim">at near exp.</span>');
+    rows += row('Max loss', '<span class="loss">' + m.maxLoss + '</span>');
+    rows += row('Break-even', m.breakEvens.join(', ') || '—');
+    return rows;
+  }
+  // Pick the right metrics table for a strategy (time-based or at-expiration).
+  function metricsTableFor(strategy) {
+    return strategy.timeBased ? metricsTableHTMLTime(strategy.legs) : metricsTableHTML(strategy.legs);
+  }
+
   global.Payoff = {
     SPOT: SPOT, CONTRACT: CONTRACT, PREMIUM: PREMIUM,
     intrinsic: intrinsic, premium: premium, legStrike: legStrike,
     payoffAt: payoffAt, netDebit: netDebit,
     computeMetrics: computeMetrics, describeMetrics: describeMetrics, displayDomain: displayDomain,
     renderSVG: renderSVG, renderStrategy: renderStrategy, metricsTableHTML: metricsTableHTML,
+    metricsTableFor: metricsTableFor,
+    // time-based (calendars/diagonals/doubles) — near-expiry approximation
+    payoffAtNearExpiry: payoffAtNearExpiry, computeMetricsTime: computeMetricsTime,
+    describeMetricsTime: describeMetricsTime, renderTimeBased: renderTimeBased,
+    metricsTableHTMLTime: metricsTableHTMLTime, hasFarLeg: hasFarLeg,
     // absolute / sandbox
     payoffAtAbs: payoffAtAbs, computeMetricsAbs: computeMetricsAbs,
     describeMetricsAbs: describeMetricsAbs, renderCustom: renderCustom, domainAbs: domainAbs

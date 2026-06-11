@@ -391,6 +391,72 @@
         [ { action: 'sell', type: 'call', strike: -5, qty: 1, expiry: 'near' }, { action: 'buy', type: 'call', strike: 5, qty: 1, expiry: 'near' } ],
         [ { action: 'sell', type: 'put', strike: 5, qty: 1, expiry: 'near' }, { action: 'buy', type: 'put', strike: -5, qty: 1, expiry: 'near' } ]
       ]
+    },
+
+    /* ---------------- TIME-BASED (Advanced) ----------------
+       Two expiries — payoff is valued AT THE NEAR expiry (see payoff.js
+       near-expiry model). Tent-shaped: peaks near the strike, bounded loss. */
+    {
+      id: 'calendar-spread', name: 'Calendar Spread', category: 'advanced', tier: 'Advanced', timeBased: true,
+      legs: [
+        { action: 'sell', type: 'call', strike: 0, qty: 1, expiry: 'near' },
+        { action: 'buy', type: 'call', strike: 0, qty: 1, expiry: 'far' }
+      ],
+      priceOutlook: 'neutral', volOutlook: 'long vol',
+      profitPotential: 'limited', risk: 'limited',
+      greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'long' },
+      aka: ['calendar spread', 'calendar', 'time spread', 'horizontal spread', 'call calendar'],
+      blurb: 'Sell a near-dated option and buy a far-dated one at the same strike. The near leg decays faster, so you profit if the underlying pins the strike into the near expiry; the long back-month keeps value and vega. Max value at the strike; loss limited to the debit.'
+    },
+    {
+      id: 'diagonal-spread', name: 'Diagonal Spread', category: 'advanced', tier: 'Advanced', timeBased: true,
+      legs: [
+        { action: 'buy', type: 'call', strike: 0, qty: 1, expiry: 'far' },
+        { action: 'sell', type: 'call', strike: 5, qty: 1, expiry: 'near' }
+      ],
+      priceOutlook: 'bullish', volOutlook: 'long vol',
+      profitPotential: 'limited', risk: 'limited',
+      greeks: { delta: 'long', gamma: 'short', theta: 'long', vega: 'long' },
+      aka: ['diagonal spread', 'diagonal', 'call diagonal', "poor man's covered call"],
+      blurb: 'A calendar with different strikes: buy a far-dated call and sell a nearer, higher-strike call against it. Blends time-decay income with a mild bullish lean — like a capital-efficient covered call.'
+    },
+    {
+      id: 'double-calendar', name: 'Double Calendar', category: 'advanced', tier: 'Advanced', timeBased: true,
+      legs: [
+        { action: 'sell', type: 'put', strike: -15, qty: 1, expiry: 'near' },
+        { action: 'buy', type: 'put', strike: -15, qty: 1, expiry: 'far' },
+        { action: 'sell', type: 'call', strike: 15, qty: 1, expiry: 'near' },
+        { action: 'buy', type: 'call', strike: 15, qty: 1, expiry: 'far' }
+      ],
+      priceOutlook: 'neutral', volOutlook: 'long vol',
+      profitPotential: 'limited', risk: 'limited',
+      greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'long' },
+      aka: ['double calendar', 'double calendar spread'],
+      blurb: 'A put calendar below and a call calendar above. A wider, twin-peaked neutral zone that profits from near-term time decay and rising volatility while the underlying stays in range.'
+    },
+    {
+      id: 'put-calendar', name: 'Put Calendar', category: 'advanced', tier: 'Advanced', timeBased: true,
+      legs: [
+        { action: 'sell', type: 'put', strike: 0, qty: 1, expiry: 'near' },
+        { action: 'buy', type: 'put', strike: 0, qty: 1, expiry: 'far' }
+      ],
+      priceOutlook: 'neutral', volOutlook: 'long vol',
+      profitPotential: 'limited', risk: 'limited',
+      greeks: { delta: 'neutral', gamma: 'short', theta: 'long', vega: 'long' },
+      aka: ['put calendar', 'put calendar spread', 'put time spread'],
+      blurb: 'A calendar built with puts: sell the near-dated put, buy the far-dated put at the same strike. Same tent shape and long-vega / positive-theta profile as a call calendar.'
+    },
+    {
+      id: 'put-diagonal', name: 'Put Diagonal', category: 'advanced', tier: 'Advanced', timeBased: true,
+      legs: [
+        { action: 'buy', type: 'put', strike: 0, qty: 1, expiry: 'far' },
+        { action: 'sell', type: 'put', strike: -5, qty: 1, expiry: 'near' }
+      ],
+      priceOutlook: 'bearish', volOutlook: 'long vol',
+      profitPotential: 'limited', risk: 'limited',
+      greeks: { delta: 'short', gamma: 'short', theta: 'long', vega: 'long' },
+      aka: ['put diagonal', 'put diagonal spread'],
+      blurb: 'A diagonal built with puts: buy a far-dated put and sell a nearer, lower-strike put. Time-decay income with a mild bearish lean.'
     }
   ];
 

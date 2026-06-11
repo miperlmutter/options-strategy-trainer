@@ -24,10 +24,11 @@
   }
 
   // Two leg-sets match if their payoff curves agree across the domain.
-  function curvesMatch(a, b) {
+  // `fn` is the payoff function (at-expiration or near-expiry for time-based).
+  function curvesMatch(a, b, fn) {
     if (!a.length) return false;
-    for (var s = 0; s <= 200; s += 2) {
-      if (Math.abs(global.Payoff.payoffAt(a, s) - global.Payoff.payoffAt(b, s)) > 0.25) return false;
+    for (var s = 0; s <= 250; s += 2) {
+      if (Math.abs(fn(a, s) - fn(b, s)) > 0.3) return false;
     }
     return true;
   }
@@ -44,7 +45,7 @@
 
   function init(view, ctx) {
     var h = ctx.h;
-    var pool = ctx.strategies.filter(function (s) { return !s.timeBased; });
+    var pool = ctx.strategies;
     var state = { target: null, legs: [], solved: 0, attempts: 0, revealed: false };
     var nameInputEl = null;
 
@@ -77,7 +78,12 @@
       var s = state.target;
       targetCol.innerHTML = '';
       targetCol.appendChild(h('div', { class: 'fc-section-label', text: 'Target payoff' }));
-      targetCol.appendChild(global.Payoff.renderSVG(s.legs, { width: 380, height: 210, components: [] }));
+      targetCol.appendChild(s.timeBased
+        ? global.Payoff.renderTimeBased(s.legs, { width: 380, height: 210, components: [] })
+        : global.Payoff.renderSVG(s.legs, { width: 380, height: 210, components: [] }));
+      if (s.timeBased) {
+        targetCol.appendChild(h('div', { class: 'tag-line', style: 'margin-top:4px;color:#a371f7', text: 'P/L valued at the near-dated expiry' }));
+      }
       targetCol.appendChild(h('div', { class: 'tags', style: 'margin-top:10px' }, [
         h('span', { class: 'pill', text: s.priceOutlook }),
         h('span', { class: 'pill', text: s.volOutlook }),
@@ -111,16 +117,18 @@
       var strikeSel = sel(STRIKES.map(function (k) { return String(k); }), STRIKES.map(function (k) { return '$' + (SPOT + k); }));
       strikeSel.value = '0';
       var qtyInp = h('input', { class: 'q-input pairs-input', type: 'number', min: '1', max: '5', step: '1', value: '1' });
+      var expirySel = sel(['near', 'far']);  // for calendars / diagonals
 
-      function syncType() { strikeSel.disabled = (typeSel.value === 'stock'); }
+      function syncType() { var st = (typeSel.value === 'stock'); strikeSel.disabled = st; expirySel.disabled = st; }
       typeSel.addEventListener('change', syncType); syncType();
 
       var adder = h('div', { class: 'leg-adder' }, [
-        actionSel, typeSel, strikeSel, qtyInp,
+        actionSel, typeSel, strikeSel, qtyInp, expirySel,
         h('button', { class: 'btn primary', text: '+ Add leg', onclick: function () {
           var leg = { action: actionSel.value, type: typeSel.value,
                       strike: typeSel.value === 'stock' ? 0 : parseInt(strikeSel.value, 10),
-                      qty: Math.max(1, Math.min(5, parseInt(qtyInp.value, 10) || 1)), expiry: 'near' };
+                      qty: Math.max(1, Math.min(5, parseInt(qtyInp.value, 10) || 1)),
+                      expiry: typeSel.value === 'stock' ? 'near' : expirySel.value };
           state.legs.push(leg);
           renderBuild();
         } })
@@ -145,9 +153,13 @@
       // live preview + pricing/metrics
       buildCol.appendChild(h('div', { class: 'fc-section-label', text: 'Your payoff (live)' }));
       if (state.legs.length) {
-        buildCol.appendChild(global.Payoff.renderSVG(state.legs, { width: 380, height: 210 }));
+        var far = global.Payoff.hasFarLeg(state.legs);
+        buildCol.appendChild(far
+          ? global.Payoff.renderTimeBased(state.legs, { width: 380, height: 210 })
+          : global.Payoff.renderSVG(state.legs, { width: 380, height: 210 }));
+        if (far) buildCol.appendChild(h('div', { class: 'tag-line', style: 'margin-top:4px;color:#a371f7', text: 'P/L valued at the near-dated expiry' }));
         var mt = h('div', { class: 'metrics', style: 'margin-top:8px' });
-        mt.innerHTML = global.Payoff.metricsTableHTML(state.legs);
+        mt.innerHTML = far ? global.Payoff.metricsTableHTMLTime(state.legs) : global.Payoff.metricsTableHTML(state.legs);
         buildCol.appendChild(mt);
       } else {
         buildCol.appendChild(h('div', { class: 'tag-line', text: '—' }));
@@ -168,7 +180,9 @@
       var nameVal = nameInputEl ? nameInputEl.value : '';
       var accept = [norm(state.target.name)].concat((state.target.aka || []).map(norm));
       var nameOk = nameVal.trim() !== '' && accept.indexOf(norm(nameVal)) >= 0;
-      var curveOk = curvesMatch(state.legs, state.target.legs);
+      // time-based targets compare on the near-expiry curve; everything else at expiration
+      var pf = state.target.timeBased ? global.Payoff.payoffAtNearExpiry : global.Payoff.payoffAt;
+      var curveOk = curvesMatch(state.legs, state.target.legs, pf);
 
       if (nameOk || curveOk) {
         state.solved++;

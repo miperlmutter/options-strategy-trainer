@@ -91,8 +91,11 @@
 
       var left = h('div');
       left.appendChild(global.Payoff.renderStrategy(s, { width: 360, height: 200 }));
+      if (s.timeBased) {
+        left.appendChild(h('div', { class: 'tag-line', style: 'margin-top:4px;color:#a371f7', text: 'P/L valued at the near-dated expiry' }));
+      }
       var metrics = h('div', { class: 'metrics', style: 'margin-top:8px' });
-      metrics.innerHTML = global.Payoff.metricsTableHTML(s.legs);
+      metrics.innerHTML = global.Payoff.metricsTableFor(s);
       left.appendChild(metrics);
 
       var right = h('div');

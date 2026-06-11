@@ -37,8 +37,9 @@
       label: 'Graph',
       key: function (s) {
         // sample the curve so visually-identical payoffs collide (and get deduped)
+        var pf = s.timeBased ? global.Payoff.payoffAtNearExpiry : global.Payoff.payoffAt;
         var pts = [];
-        for (var x = SPOT - 20; x <= SPOT + 20; x += 5) pts.push(Math.round(global.Payoff.payoffAt(s.legs, x)));
+        for (var x = SPOT - 20; x <= SPOT + 20; x += 5) pts.push(Math.round(pf(s.legs, x)));
         return pts.join(',');
       },
       render: function (s, h) {

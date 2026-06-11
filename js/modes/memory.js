@@ -20,7 +20,7 @@
         h('div', { text: s.priceOutlook + ' · ' + s.volOutlook }),
         h('div', { class: 'dim', text: 'profit ' + s.profitPotential + ' · risk ' + s.risk })]); } },
     graph: { label: 'Graph',
-      key: function (s) { var p = []; for (var x = SPOT - 20; x <= SPOT + 20; x += 5) p.push(Math.round(global.Payoff.payoffAt(s.legs, x))); return p.join(','); },
+      key: function (s) { var pf = s.timeBased ? global.Payoff.payoffAtNearExpiry : global.Payoff.payoffAt; var p = []; for (var x = SPOT - 20; x <= SPOT + 20; x += 5) p.push(Math.round(pf(s.legs, x))); return p.join(','); },
       render: function (s, h) { var b = h('div', { class: 'tile-graph' }); b.appendChild(global.Payoff.renderStrategy(s, { width: 200, height: 110, mini: true })); return b; } }
   };
 

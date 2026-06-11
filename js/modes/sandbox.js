@@ -44,7 +44,7 @@
     var libOf = function (l) { return l.type === 'stock' ? SPOT : SPOT + (l.strike || 0); };
     var us = signature(userLegs, userOf);
 
-    var lib = global.StrategyLib.all();
+    var lib = global.StrategyLib.all().filter(function (s) { return !s.timeBased; });
     for (var i = 0; i < lib.length; i++) {
       if (signature(lib[i].legs, libOf) === us) return lib[i].name;
     }
