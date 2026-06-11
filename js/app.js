@@ -172,7 +172,9 @@
 
     v.appendChild(h('div', { class: 'home-footer' }, [
       h('div', { text: '© 2026 Puma Capital, LLC' }),
-      h('div', { class: 'home-footer-sub', text: 'Internal training tool' })
+      h('div', { class: 'home-footer-sub', text: 'New York (Headquarters)' }),
+      h('div', { class: 'home-footer-sub', text: '555 Theodore Fremd Ave, Suite C-204, Rye, NY 10580' }),
+      h('div', { class: 'home-footer-sub', text: 'Phone: 212.269.4100' })
     ]));
 
     updateCount();
