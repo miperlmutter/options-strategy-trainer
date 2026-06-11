@@ -78,9 +78,12 @@
       var s = state.target;
       targetCol.innerHTML = '';
       targetCol.appendChild(h('div', { class: 'fc-section-label', text: 'Target payoff' }));
+      // Flat-payoff strategies that define logical sub-structures (the boxes) show
+      // their decomposition dotted lines here — like Flashcards — so the flat target
+      // is legible. Everything else stays a clean single line (components: []).
       targetCol.appendChild(s.timeBased
         ? global.Payoff.renderTimeBased(s.legs, { width: 380, height: 210, components: [] })
-        : global.Payoff.renderSVG(s.legs, { width: 380, height: 210, components: [] }));
+        : global.Payoff.renderSVG(s.legs, { width: 380, height: 210, components: s.components || [] }));
       if (s.timeBased) {
         targetCol.appendChild(h('div', { class: 'tag-line', style: 'margin-top:4px;color:#a371f7', text: 'P/L valued at the near-dated expiry' }));
       }
