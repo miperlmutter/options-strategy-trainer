@@ -107,22 +107,8 @@
       h('span', { id: 'active-count', class: 'tag-line' })
     ]));
 
-    // tier presets
-    scope.appendChild(h('div', { class: 'tag-line', style: 'margin:14px 0 6px', text: 'Quick presets' }));
-    var presets = h('div', { class: 'row' });
-    [['Beginner', ['Beginner']], ['Intermediate', ['Beginner', 'Intermediate']],
-     ['Advanced', ['Beginner', 'Intermediate', 'Advanced']], ['Everything', ['Beginner', 'Intermediate', 'Advanced']]]
-    .forEach(function (p) {
-      presets.appendChild(h('button', { class: 'btn ghost', text: p[0], onclick: function () {
-        StrategyLib.TIERS.forEach(function (t) { App.session.tiers[t] = p[1].indexOf(t) >= 0; });
-        StrategyLib.CATEGORIES.forEach(function (c) { App.session.cats[c] = true; });
-        refreshHomeControls();
-      } }));
-    });
-    scope.appendChild(presets);
-
     // tier checkboxes
-    scope.appendChild(h('div', { class: 'tag-line', style: 'margin:16px 0 6px', text: 'Difficulty tiers' }));
+    scope.appendChild(h('div', { class: 'tag-line', style: 'margin:14px 0 6px', text: 'Difficulty tiers' }));
     var tierRow = h('div', { class: 'row' });
     StrategyLib.TIERS.forEach(function (t) {
       tierRow.appendChild(checkbox('tier-' + t, t, App.session.tiers[t], function (on) {
@@ -257,16 +243,6 @@
     wrap.appendChild(box);
     wrap.appendChild(document.createTextNode(label));
     return wrap;
-  }
-
-  function refreshHomeControls() {
-    StrategyLib.TIERS.forEach(function (t) {
-      var el = document.getElementById('tier-' + t); if (el) el.checked = App.session.tiers[t];
-    });
-    StrategyLib.CATEGORIES.forEach(function (c) {
-      var el = document.getElementById('cat-' + c); if (el) el.checked = App.session.cats[c];
-    });
-    updateCount();
   }
 
   function updateCount() {
