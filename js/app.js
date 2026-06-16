@@ -148,11 +148,17 @@
       var card = h('div', { class: 'card', style: 'cursor:pointer', onclick: function () { App.go(m.id); } });
       card.appendChild(h('div', { class: 'card-head' }, [ h('span', { class: 'name', text: m.label }) ]));
       card.appendChild(h('p', { class: 'sub', style: 'margin:0', text: m.blurb || '' }));
-      var best = Store.get(m.id);
       var bits = [];
-      if (best.plays) bits.push(best.plays + ' play' + (best.plays > 1 ? 's' : ''));
-      if (best.bestScore != null) bits.push('best ' + best.bestScore);
-      if (best.bestTimeMs != null) bits.push('fastest ' + Store.fmtTime(best.bestTimeMs));
+      if (m.aggregateKeys) {
+        // Drills' stats live under its sub-games' keys — sum their plays for the card.
+        var totalPlays = m.aggregateKeys.reduce(function (sum, k) { return sum + (Store.get(k).plays || 0); }, 0);
+        if (totalPlays) bits.push(totalPlays + ' play' + (totalPlays > 1 ? 's' : ''));
+      } else {
+        var best = Store.get(m.id);
+        if (best.plays) bits.push(best.plays + ' play' + (best.plays > 1 ? 's' : ''));
+        if (best.bestScore != null) bits.push('best ' + best.bestScore);
+        if (best.bestTimeMs != null) bits.push('fastest ' + Store.fmtTime(best.bestTimeMs));
+      }
       card.appendChild(h('div', { class: 'tag-line', style: 'margin-top:10px', text: bits.join(' · ') || 'not played yet' }));
       grid.appendChild(card);
     });
@@ -161,14 +167,23 @@
     v.appendChild(renderGlossary());
 
     var ref = h('p', { class: 'sub', style: 'margin-top:24px' }, [
-      'Want to inspect every strategy at once? Open the ',
-      h('a', { href: 'gallery.html', text: 'Strategy Gallery' }), '.'
+      'Want to see every strategy at once? Open the ',
+      h('a', { href: 'gallery.html', text: 'Strategy Reference' }), '.'
     ]);
     v.appendChild(ref);
 
     if (!Store.available()) {
       v.appendChild(h('p', { class: 'tag-line', style: 'color:var(--gold)', text: '⚠ localStorage unavailable — scores and streaks will not persist this session.' }));
     }
+
+    v.appendChild(h('div', { class: 'row', style: 'margin-top:20px' }, [
+      h('button', { class: 'btn ghost', text: 'Reset all progress', onclick: function () {
+        if (window.confirm('Reset all saved scores, streaks and best times on this browser? This cannot be undone.')) {
+          Store.clear();
+          App.go('home');
+        }
+      } })
+    ]));
 
     v.appendChild(h('div', { class: 'home-footer' }, [
       h('div', { text: '© 2026 Puma Capital, LLC' }),

@@ -916,6 +916,8 @@
   global.App.registerMode({
     id: 'drills', label: 'Drills', minStrategies: 0,
     blurb: 'Timed practice games that sharpen the mental math and fast recognition options trading runs on.',
+    // the Drills card on Home sums plays across these sub-game store keys
+    aggregateKeys: ['box-pricing', 'option-value', 'moneyness', 'breakeven', 'greeks', 'greeks-predict', 'outlook'],
     init: init
   });
 })(window);
