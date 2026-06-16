@@ -738,10 +738,33 @@
   function runTimedQuiz(view, ctx, back, cfg) {
     var h = ctx.h;
     var N = 10;
-    var state = { i: 0, score: 0, streak: 0, correctCount: 0, qs: [], answered: false, startMs: 0, elapsedMs: 0, timerId: null };
+    var state = { i: 0, score: 0, streak: 0, correctCount: 0, qs: [], answered: false, startMs: 0, elapsedMs: 0, timerId: null, paused: false, pausedAt: 0, active: false };
 
     function stopTimer() { if (state.timerId) { clearInterval(state.timerId); state.timerId = null; } }
     function leave() { stopTimer(); back(); }
+
+    // Pause a count-up stopwatch: stop ticking and hide the question; on resume,
+    // push startMs forward by the paused gap so the pause doesn't count.
+    function togglePause() {
+      if (!state.active) return;
+      var btn = document.getElementById('tq-pause');
+      if (!state.paused) {
+        state.paused = true; state.pausedAt = Date.now();
+        stopTimer();
+        if (btn) btn.textContent = '▶ Resume';
+        area.style.display = 'none';
+        pausedMsg.style.display = '';
+      } else {
+        state.paused = false;
+        state.startMs += (Date.now() - state.pausedAt);
+        stopTimer();
+        state.timerId = setInterval(updateTime, 100);
+        updateTime();
+        if (btn) btn.textContent = '⏸ Pause';
+        pausedMsg.style.display = 'none';
+        area.style.display = '';
+      }
+    }
 
     view.innerHTML = '';
     view.appendChild(h('div', { class: 'row', style: 'margin-bottom:4px' }, [
@@ -761,9 +784,13 @@
     var hud = h('div', { class: 'row hud', style: 'margin-bottom:12px;display:none' }, [
       h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Time ' }), h('span', { id: 'tq-time', class: 'mono', text: '0.0s' })]),
       h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Q ' }), h('span', { id: 'tq-q', class: 'mono', text: '0/' + N })]),
-      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Correct ' }), h('span', { id: 'tq-correct', class: 'mono', text: '0' })])
+      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Correct ' }), h('span', { id: 'tq-correct', class: 'mono', text: '0' })]),
+      h('span', { style: 'flex:1' }),
+      h('button', { id: 'tq-pause', class: 'btn ghost', text: '⏸ Pause', onclick: togglePause })
     ]);
     view.appendChild(hud);
+    var pausedMsg = h('div', { class: 'paused-msg', style: 'display:none' }, '⏸ Paused — the clock is stopped and the question is hidden. Press Resume to continue.');
+    view.appendChild(pausedMsg);
     var area = h('div');
     view.appendChild(area);
 
@@ -783,7 +810,11 @@
       }
       state.qs = qs; state.i = 0; state.score = 0; state.streak = 0; state.correctCount = 0;
       state.startMs = Date.now(); state.elapsedMs = 0;
+      state.paused = false; state.active = true;
       hud.style.display = 'flex';
+      pausedMsg.style.display = 'none';
+      area.style.display = '';
+      var pb = document.getElementById('tq-pause'); if (pb) { pb.textContent = '⏸ Pause'; pb.disabled = false; }
       stopTimer();
       state.timerId = setInterval(updateTime, 100);
       updateTime();
@@ -815,7 +846,7 @@
     }
 
     function answer(oi, optWrap, q) {
-      if (state.answered) return;
+      if (state.answered || state.paused) return;
       state.answered = true;
       var correct = oi === q.answer;
       Array.prototype.forEach.call(optWrap.children, function (b, idx) {
@@ -826,7 +857,10 @@
       if (correct) { state.streak++; state.score += 10 + (state.streak - 1) * 2; state.correctCount++; } else { state.streak = 0; }
       document.getElementById('tq-correct').textContent = state.correctCount;
       var last = state.i === N - 1;
-      if (last) { state.elapsedMs = Date.now() - state.startMs; stopTimer(); updateTime(); }   // freeze the clock at completion
+      if (last) {                                              // freeze the clock + disable pause at completion
+        state.elapsedMs = Date.now() - state.startMs; state.active = false; stopTimer(); updateTime();
+        var pb = document.getElementById('tq-pause'); if (pb) pb.disabled = true;
+      }
       var fb = document.getElementById('tq-fb');
       fb.appendChild(h('div', { class: 'feedback ' + (correct ? 'ok' : 'no'), text: (correct ? '✓ ' : '✗ ') + q.explain }));
       fb.appendChild(h('button', { class: 'btn primary', style: 'margin-top:8px', text: last ? 'Finish ▸' : 'Next ▸', onclick: function () {
@@ -835,8 +869,11 @@
     }
 
     function finish() {
+      state.active = false; state.paused = false;
       var rec = ctx.Store.record(cfg.storeKey, { score: state.correctCount, timeMs: state.elapsedMs });
       area.innerHTML = '';
+      area.style.display = '';
+      pausedMsg.style.display = 'none';
       hud.style.display = 'none';
       var pb = (rec.bestTimeMs === state.elapsedMs) ? ' 🏆 new best time!' : '';
       area.appendChild(h('div', { class: 'muted-box' }, [
