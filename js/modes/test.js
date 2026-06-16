@@ -39,6 +39,14 @@
   function DB() { return global.DrillBank || {}; }
   function pxNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(2); }
   function money2(n) { var a = Math.abs(n); return (n < 0 ? '−$' : '$') + (Number.isInteger(a) ? String(a) : a.toFixed(2)); }
+  function isAnswered(r) {
+    if (!r) return false;
+    if (r.mc != null) return true;
+    if (r.type && r.type.trim() !== '') return true;
+    if (r.num != null && String(r.num).trim() !== '') return true;
+    if (r.sall) { for (var k in r.sall) { if (r.sall[k]) return true; } }
+    return false;
+  }
 
   /* ---- distractor names: n wrong names different from the answer ---- */
   function otherNames(pool, answer, n) {
@@ -214,10 +222,10 @@
   function init(view, ctx) {
     var h = ctx.h;
     var pool = ctx.strategies;
-    var state = { qs: [], i: 0, answers: [], count: 10 };
+    var state = { qs: [], i: 0, responses: [], count: 10 };
 
     view.appendChild(h('h1', { text: 'Test' }));
-    view.appendChild(h('p', { class: 'sub', text: 'A mixed exam spanning every mode — recognize strategies from graphs and legs, outlook & Greeks, moneyness, intrinsic value, and break-evens. Multiple choice, type-the-answer, calculate-the-value, and select-all. Graded at the end with the correct answer and a short "why" for each.' }));
+    view.appendChild(h('p', { class: 'sub', text: 'A mixed exam spanning every mode — recognize strategies from graphs and legs, outlook & Greeks, moneyness, intrinsic value, and break-evens. Multiple choice, type-the-answer, calculate-the-value, and select-all. Use Back / Next to move between questions and change answers freely; it is graded only when you finish, with the correct answer and a short "why" for each.' }));
 
     var setup = h('div', { class: 'muted-box', style: 'margin-bottom:16px' });
     var cs = h('select', { class: 'btn ghost' });
@@ -235,20 +243,24 @@
 
     function start() {
       state.qs = buildQuestions(pool, state.count);
-      state.i = 0; state.answers = [];
+      state.i = 0; state.responses = [];
       renderQuestion();
     }
 
+    // One question per screen, with Back / Next. Answers are stored per index
+    // in state.responses and graded only at finish, so you can revise freely.
     function renderQuestion() {
       var q = state.qs[state.i];
+      var resp = state.responses[state.i] || {};
       area.innerHTML = '';
 
+      var answeredCount = state.responses.filter(isAnswered).length;
       var head = h('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:8px' }, [
         h('span', { class: 'tag-line', text: 'Question ' + (state.i + 1) + ' of ' + state.qs.length }),
-        h('span', { class: 'tag-line', text: qkindLabel(q.kind) })
+        h('span', { class: 'tag-line', text: qkindLabel(q.kind) + ' · ' + answeredCount + ' answered' })
       ]);
       area.appendChild(head);
-      var bar = h('div', { class: 'progress' }, [ h('div', { class: 'progress-fill', style: 'width:' + (state.i / state.qs.length * 100) + '%' }) ]);
+      var bar = h('div', { class: 'progress' }, [ h('div', { class: 'progress-fill', style: 'width:' + ((state.i + 1) / state.qs.length * 100) + '%' }) ]);
       area.appendChild(bar);
 
       var card = h('div', { class: 'muted-box', style: 'margin-top:14px' });
@@ -256,7 +268,8 @@
       if (q.promptMono) card.appendChild(h('div', { class: 'greek-profile-prompt mono', text: q.promptMono }));
       if (q.node) card.appendChild(h('div', { class: 'q-node' }, [q.node()]));
 
-      var chosen = { mc: null, type: '', sall: {} };
+      var chosen = { mc: (resp.mc != null ? resp.mc : null), sall: {} };
+      var inp = null, ninp = null;
 
       if (q.kind === 'mc') {
         var optWrap = h('div', { class: 'q-options' });
@@ -266,57 +279,68 @@
             Array.prototype.forEach.call(optWrap.children, function (c) { c.classList.remove('chosen'); });
             b.classList.add('chosen');
           } });
+          if (chosen.mc === oi) b.classList.add('chosen');
           optWrap.appendChild(b);
         });
         card.appendChild(optWrap);
 
       } else if (q.kind === 'type') {
-        var inp = h('input', { class: 'q-input', type: 'text', placeholder: 'Type the strategy name…', autocomplete: 'off' });
-        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+        inp = h('input', { class: 'q-input', type: 'text', placeholder: 'Type the strategy name…', autocomplete: 'off' });
+        inp.value = resp.type || '';
+        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') goNext(); });
         card.appendChild(inp);
         card.appendChild(h('div', { class: 'tag-line', text: 'Synonyms & abbreviations accepted (e.g. "IC", "ironfly", "long call spread").' }));
-        chosen._inp = inp;
 
       } else if (q.kind === 'sall') {
         var sw = h('div', { class: 'q-options' });
         q.options.forEach(function (opt, oi) {
+          var pre = !!(resp.sall && resp.sall[oi]);
+          if (pre) chosen.sall[oi] = true;
           var b = h('button', { class: 'q-opt', text: opt.label, onclick: function () {
             chosen.sall[oi] = !chosen.sall[oi];
             b.classList.toggle('chosen', !!chosen.sall[oi]);
           } });
+          if (pre) b.classList.add('chosen');
           sw.appendChild(b);
         });
         card.appendChild(sw);
-        card.appendChild(h('div', { class: 'tag-line', text: 'Select every strategy that applies, then submit.' }));
+        card.appendChild(h('div', { class: 'tag-line', text: 'Select every strategy that applies.' }));
 
       } else if (q.kind === 'num') {
-        var ninp = h('input', { class: 'q-input', type: 'number', step: '0.25', placeholder: 'Type a dollar amount…', autocomplete: 'off', style: 'max-width:260px' });
-        ninp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+        ninp = h('input', { class: 'q-input', type: 'number', step: '0.25', placeholder: 'Type a dollar amount…', autocomplete: 'off', style: 'max-width:260px' });
+        ninp.value = resp.num || '';
+        ninp.addEventListener('keydown', function (e) { if (e.key === 'Enter') goNext(); });
         card.appendChild(ninp);
         card.appendChild(h('div', { class: 'tag-line', text: 'Enter the price / amount in dollars (per share).' }));
-        chosen._ninp = ninp;
       }
 
-      var submitBtn = h('button', { class: 'btn primary', style: 'margin-top:14px', text: state.i === state.qs.length - 1 ? 'Finish ▸' : 'Submit ▸', onclick: submit });
-      card.appendChild(submitBtn);
+      function capture() {
+        if (q.kind === 'mc') state.responses[state.i] = { mc: chosen.mc };
+        else if (q.kind === 'type') state.responses[state.i] = { type: inp.value };
+        else if (q.kind === 'num') state.responses[state.i] = { num: ninp.value };
+        else if (q.kind === 'sall') state.responses[state.i] = { sall: chosen.sall };
+      }
+      function goPrev() { capture(); if (state.i > 0) { state.i--; renderQuestion(); } }
+      function goNext() { capture(); state.i++; if (state.i >= state.qs.length) finish(); else renderQuestion(); }
+
+      var last = state.i === state.qs.length - 1;
+      var backBtn = h('button', { class: 'btn ghost', text: '← Back', onclick: goPrev });
+      backBtn.disabled = (state.i === 0);
+      var nextBtn = h('button', { class: 'btn primary', text: last ? 'Finish ▸' : 'Next ▸', onclick: goNext });
+      card.appendChild(h('div', { class: 'row', style: 'margin-top:14px' }, [
+        backBtn, h('span', { style: 'flex:1' }), nextBtn
+      ]));
       area.appendChild(card);
-
-      function submit() {
-        var correct = grade(q, chosen);
-        state.answers.push({ q: q, correct: correct });
-        state.i++;
-        if (state.i >= state.qs.length) finish();
-        else renderQuestion();
-      }
     }
 
-    function grade(q, chosen) {
-      if (q.kind === 'mc') return chosen.mc === q.answer;
-      if (q.kind === 'type') return q.accept.indexOf(norm(chosen._inp.value)) >= 0;
-      if (q.kind === 'num') { var v = parseFloat(chosen._ninp.value); return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01); }
+    function grade(q, resp) {
+      resp = resp || {};
+      if (q.kind === 'mc') return resp.mc === q.answer;
+      if (q.kind === 'type') return q.accept.indexOf(norm(resp.type || '')) >= 0;
+      if (q.kind === 'num') { var v = parseFloat(resp.num); return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01); }
       if (q.kind === 'sall') {
         for (var i = 0; i < q.options.length; i++) {
-          if (!!chosen.sall[i] !== !!q.options[i].correct) return false;
+          if (!!(resp.sall && resp.sall[i]) !== !!q.options[i].correct) return false;
         }
         return true;
       }
@@ -324,15 +348,16 @@
     }
 
     function finish() {
-      var score = state.answers.filter(function (a) { return a.correct; }).length;
-      var total = state.answers.length;
+      var answers = state.qs.map(function (q, i) { return { q: q, correct: grade(q, state.responses[i]) }; });
+      var score = answers.filter(function (a) { return a.correct; }).length;
+      var total = answers.length;
       var rec = ctx.Store.record('test', { score: score, total: total });
       area.innerHTML = '';
       var pct = Math.round(score / total * 100);
       area.appendChild(h('div', { class: 'muted-box' }, [
         h('h2', { text: 'Score: ' + score + ' / ' + total + '  (' + pct + '%)' }),
         h('p', { class: 'tag-line', text: 'Best score this machine: ' + (rec.bestScore || score) + ' · tests taken: ' + rec.plays }),
-        review(),
+        review(answers),
         h('div', { class: 'row', style: 'margin-top:8px' }, [
           h('button', { class: 'btn primary', text: '▶ New test', onclick: start }),
           h('button', { class: 'btn', text: '← Home', onclick: ctx.home })
@@ -340,10 +365,10 @@
       ]));
     }
 
-    function review() {
+    function review(answers) {
       var wrap = h('div', { style: 'margin:12px 0' });
       wrap.appendChild(h('div', { class: 'fc-section-label', text: 'Review — correct answer and why' }));
-      state.answers.forEach(function (a, i) {
+      answers.forEach(function (a, i) {
         var ans = a.q.kind === 'mc' ? a.q.correctLabel
                 : (a.q.kind === 'type' || a.q.kind === 'num') ? a.q.displayAnswer
                 : a.q.options.filter(function (o) { return o.correct; }).map(function (o) { return o.label; }).join(', ') || '(none)';
