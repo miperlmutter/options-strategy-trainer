@@ -238,7 +238,7 @@
   function runOption(view, ctx, back) {
     var h = ctx.h;
     var ROUND_MS = 90000;
-    var state = { score: 0, correct: 0, attempted: 0, streak: 0, deadline: 0, timerId: null, q: null, answered: false, running: false };
+    var state = { score: 0, correct: 0, attempted: 0, streak: 0, deadline: 0, remainingMs: 0, timerId: null, q: null, answered: false, running: false, paused: false };
 
     function stopTimer() { if (state.timerId) { clearInterval(state.timerId); state.timerId = null; } }
     function leave() { stopTimer(); state.running = false; back(); }
@@ -262,17 +262,50 @@
       h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Time ' }), h('span', { id: 'ov-time', class: 'mono', text: '90s' })]),
       h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Correct ' }), h('span', { id: 'ov-correct', class: 'mono', text: '0' })]),
       h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Streak ' }), h('span', { id: 'ov-streak', class: 'mono', text: '0' })]),
-      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Score ' }), h('span', { id: 'ov-score', class: 'mono', text: '0' })])
+      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Score ' }), h('span', { id: 'ov-score', class: 'mono', text: '0' })]),
+      h('span', { style: 'flex:1' }),
+      h('button', { id: 'ov-pause', class: 'btn ghost', text: '⏸ Pause', onclick: togglePause })
     ]);
     view.appendChild(hud);
+    var pausedMsg = h('div', { class: 'paused-msg', style: 'display:none' }, '⏸ Paused — the clock is stopped and the question is hidden. Press Resume to continue.');
+    view.appendChild(pausedMsg);
     var area = h('div');
     view.appendChild(area);
 
+    // Pause freezes the countdown: stash the time left, stop the interval, hide the
+    // question; on resume rebuild the deadline from the remaining time and restart.
+    function togglePause() {
+      if (!state.running) return;
+      var btn = document.getElementById('ov-pause');
+      if (!state.paused) {
+        state.paused = true;
+        state.remainingMs = Math.max(0, state.deadline - Date.now());
+        stopTimer();
+        if (btn) btn.textContent = '▶ Resume';
+        area.style.display = 'none';
+        pausedMsg.style.display = '';
+      } else {
+        state.paused = false;
+        state.deadline = Date.now() + state.remainingMs;
+        stopTimer();
+        state.timerId = setInterval(tick, 250);
+        tick();
+        if (btn) btn.textContent = '⏸ Pause';
+        pausedMsg.style.display = 'none';
+        area.style.display = '';
+        var inp = area.querySelector('input.q-input');
+        if (inp && !inp.readOnly) inp.focus();
+      }
+    }
+
     function start() {
       state.score = 0; state.correct = 0; state.attempted = 0; state.streak = 0;
-      state.running = true;
+      state.running = true; state.paused = false;
       state.deadline = Date.now() + ROUND_MS;
       hud.style.display = 'flex';
+      pausedMsg.style.display = 'none';
+      area.style.display = '';
+      var pb = document.getElementById('ov-pause'); if (pb) pb.textContent = '⏸ Pause';
       stopTimer();
       state.timerId = setInterval(tick, 250);
       tick();
@@ -295,7 +328,7 @@
       area.innerHTML = '';
 
       var q = state.q;
-      function advance() { if (state.running) renderQ(); }
+      function advance() { if (state.running && !state.paused) renderQ(); }
 
       var card = h('div', { class: 'muted-box' });
       var posBox = h('div', { class: 'legs', style: 'font-size:15px;line-height:2' });
@@ -318,7 +351,7 @@
       inp.focus();
 
       function submit() {
-        if (state.answered || !state.running) return;
+        if (state.answered || !state.running || state.paused) return;
         var val = parseFloat(inp.value);
         if (isNaN(val)) { inp.focus(); return; }
         state.attempted++;
@@ -348,10 +381,12 @@
 
     function finish() {
       if (!state.running) return;
-      state.running = false;
+      state.running = false; state.paused = false;
       stopTimer();
       var rec = ctx.Store.record('option-value', { score: state.score });
-      var timeEl = document.getElementById('ov-time'); if (timeEl) { timeEl.textContent = '0s'; timeEl.style.color = ''; }
+      hud.style.display = 'none';
+      pausedMsg.style.display = 'none';
+      area.style.display = '';
       area.innerHTML = '';
       var best = (rec.bestScore === state.score && state.score > 0) ? ' 🏆 new best!' : '';
       var acc = state.attempted ? Math.round(100 * state.correct / state.attempted) : 0;
