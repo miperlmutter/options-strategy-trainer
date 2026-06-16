@@ -36,6 +36,9 @@
   }
   function sample(a, n) { return shuffle(a).slice(0, n); }
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function DB() { return global.DrillBank || {}; }
+  function pxNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(2); }
+  function money2(n) { var a = Math.abs(n); return (n < 0 ? '−$' : '$') + (Number.isInteger(a) ? String(a) : a.toFixed(2)); }
 
   /* ---- distractor names: n wrong names different from the answer ---- */
   function otherNames(pool, answer, n) {
@@ -130,8 +133,68 @@
     return d;
   }
 
+  /* ---- questions reused from the Drill games (via global.DrillBank) ----
+     Test pulls every game's question type, so it spans the whole app. */
+  function wrapMc(q) {
+    if (!q) return null;
+    return { kind: 'mc', prompt: q.promptText || q.prompt, promptMono: q.promptMono || null,
+      node: null, options: q.options, answer: q.answer, correctLabel: q.options[q.answer],
+      explain: q.explain, mono: !!q.mono };
+  }
+  function legsHtmlNode(htmlLines) {
+    var d = document.createElement('div'); d.className = 'legs q-legs';
+    d.innerHTML = htmlLines.join('<br>');
+    return d;
+  }
+
+  function genMoneyness() {
+    if (!DB().moneyness) return null;
+    var q = DB().moneyness();   // { type, K, S, answer:'ITM'|'ATM'|'OTM' }
+    var opts = ['ITM', 'ATM', 'OTM'];
+    var rule = q.type === 'Call' ? 'in-the-money when the stock is ABOVE the strike'
+                                 : 'in-the-money when the stock is BELOW the strike';
+    return { kind: 'mc', prompt: 'A ' + q.type + ' struck at $' + pxNum(q.K) + ' with the stock at $' + pxNum(q.S) + ' — is it…?',
+      node: null, options: opts, answer: opts.indexOf(q.answer), correctLabel: q.answer,
+      explain: 'A ' + q.type.toLowerCase() + ' is ' + rule + '. Stock $' + pxNum(q.S) + ' vs strike $' + pxNum(q.K) + ' → ' + q.answer + '.' };
+  }
+  function genIntrinsic() {
+    if (!DB().optionValue) return null;
+    var q = DB().optionValue();   // { type, K, S, prem, hasPrem, answer, prompt, explain }
+    var node = function () {
+      return legsHtmlNode([
+        q.hasPrem
+          ? '<span class="buy">Bought 1 ' + q.type + ' · strike $' + pxNum(q.K) + ' · paid $' + pxNum(q.prem) + '</span>'
+          : '<span>1 ' + q.type + ' · strike $' + pxNum(q.K) + '</span>',
+        '<span class="mono">Stock at expiration: $' + pxNum(q.S) + '</span>'
+      ]);
+    };
+    return { kind: 'num', prompt: q.prompt, node: node, answer: q.answer, displayAnswer: money2(q.answer), explain: q.explain, tol: 0.01 };
+  }
+  function genBreakevenNum() {
+    if (!DB().breakeven) return null;
+    var q = DB().breakeven();   // { legs:[html], prompt, answer, explain }
+    return { kind: 'num', prompt: q.prompt, node: function () { return legsHtmlNode(q.legs); },
+      answer: q.answer, displayAnswer: money2(q.answer), explain: q.explain, tol: 0.01 };
+  }
+  function genBoxNum() {
+    if (!DB().box) return null;
+    var q = DB().box();   // { legs:[{sign,t,k,p}], prompt, answer, explain }
+    var node = function () {
+      return legsHtmlNode(q.legs.map(function (l) {
+        var cls = l.sign === '+' ? 'buy' : 'sell';
+        return '<span class="' + cls + '">' + l.sign + '1 ' + l.t + ' $' + l.k + ' @ $' + l.p + '</span>';
+      }));
+    };
+    return { kind: 'num', prompt: q.prompt, node: node, answer: q.answer, displayAnswer: money2(q.answer), explain: q.explain, tol: 0.01 };
+  }
+  function genGreeksIdentify(pool) { return DB().greeksIdentify ? wrapMc(DB().greeksIdentify(pool)()) : null; }
+  function genGreeksPredict(pool) { return DB().greeksPredict ? wrapMc(DB().greeksPredict(pool)()) : null; }
+  function genOutlookPick(pool) { return DB().outlook ? wrapMc(DB().outlook(pool)()) : null; }
+
   var GENERATORS = [genGraphToName, genLegsToName, genNameToOutlook, genNameToVol,
-                    genTypeFromGraph, genTypeFromLegs, genSelectAllGreek, genSelectAllAttr];
+                    genTypeFromGraph, genTypeFromLegs, genSelectAllGreek, genSelectAllAttr,
+                    genMoneyness, genIntrinsic, genBreakevenNum, genBoxNum,
+                    genGreeksIdentify, genGreeksPredict, genOutlookPick];
 
   function buildQuestions(pool, n) {
     var qs = [];
@@ -154,7 +217,7 @@
     var state = { qs: [], i: 0, answers: [], count: 10 };
 
     view.appendChild(h('h1', { text: 'Test' }));
-    view.appendChild(h('p', { class: 'sub', text: 'Mixed questions drawn from your active strategies: multiple choice, type-the-answer, and select-all-that-apply. Graded at the end, with the correct answer and a short "why" for each.' }));
+    view.appendChild(h('p', { class: 'sub', text: 'A mixed exam spanning every mode — recognize strategies from graphs and legs, outlook & Greeks, moneyness, intrinsic value, and break-evens. Multiple choice, type-the-answer, calculate-the-value, and select-all. Graded at the end with the correct answer and a short "why" for each.' }));
 
     var setup = h('div', { class: 'muted-box', style: 'margin-bottom:16px' });
     var cs = h('select', { class: 'btn ghost' });
@@ -190,6 +253,7 @@
 
       var card = h('div', { class: 'muted-box', style: 'margin-top:14px' });
       card.appendChild(h('div', { class: 'q-prompt', text: q.prompt }));
+      if (q.promptMono) card.appendChild(h('div', { class: 'greek-profile-prompt mono', text: q.promptMono }));
       if (q.node) card.appendChild(h('div', { class: 'q-node' }, [q.node()]));
 
       var chosen = { mc: null, type: '', sall: {} };
@@ -197,7 +261,7 @@
       if (q.kind === 'mc') {
         var optWrap = h('div', { class: 'q-options' });
         q.options.forEach(function (opt, oi) {
-          var b = h('button', { class: 'q-opt', text: opt, onclick: function () {
+          var b = h('button', { class: 'q-opt' + (q.mono ? ' mono' : ''), text: opt, onclick: function () {
             chosen.mc = oi;
             Array.prototype.forEach.call(optWrap.children, function (c) { c.classList.remove('chosen'); });
             b.classList.add('chosen');
@@ -224,6 +288,13 @@
         });
         card.appendChild(sw);
         card.appendChild(h('div', { class: 'tag-line', text: 'Select every strategy that applies, then submit.' }));
+
+      } else if (q.kind === 'num') {
+        var ninp = h('input', { class: 'q-input', type: 'number', step: '0.25', placeholder: 'Type a dollar amount…', autocomplete: 'off', style: 'max-width:260px' });
+        ninp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+        card.appendChild(ninp);
+        card.appendChild(h('div', { class: 'tag-line', text: 'Enter the price / amount in dollars (per share).' }));
+        chosen._ninp = ninp;
       }
 
       var submitBtn = h('button', { class: 'btn primary', style: 'margin-top:14px', text: state.i === state.qs.length - 1 ? 'Finish ▸' : 'Submit ▸', onclick: submit });
@@ -242,6 +313,7 @@
     function grade(q, chosen) {
       if (q.kind === 'mc') return chosen.mc === q.answer;
       if (q.kind === 'type') return q.accept.indexOf(norm(chosen._inp.value)) >= 0;
+      if (q.kind === 'num') { var v = parseFloat(chosen._ninp.value); return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01); }
       if (q.kind === 'sall') {
         for (var i = 0; i < q.options.length; i++) {
           if (!!chosen.sall[i] !== !!q.options[i].correct) return false;
@@ -273,7 +345,7 @@
       wrap.appendChild(h('div', { class: 'fc-section-label', text: 'Review — correct answer and why' }));
       state.answers.forEach(function (a, i) {
         var ans = a.q.kind === 'mc' ? a.q.correctLabel
-                : a.q.kind === 'type' ? a.q.displayAnswer
+                : (a.q.kind === 'type' || a.q.kind === 'num') ? a.q.displayAnswer
                 : a.q.options.filter(function (o) { return o.correct; }).map(function (o) { return o.label; }).join(', ') || '(none)';
         wrap.appendChild(h('div', { class: 'review-row' }, [
           h('span', { class: a.correct ? 'profit' : 'loss', text: a.correct ? '✓' : '✗' }),
@@ -288,13 +360,13 @@
     }
 
     function qkindLabel(k) {
-      return k === 'mc' ? 'multiple choice' : k === 'type' ? 'type the answer' : 'select all that apply';
+      return k === 'mc' ? 'multiple choice' : k === 'type' ? 'type the answer' : k === 'num' ? 'calculate the value' : 'select all that apply';
     }
   }
 
   global.App.registerMode({
     id: 'test', label: 'Test', minStrategies: 4,
-    blurb: 'Mixed questions: multiple choice, type-the-answer, and select-all-that-apply.',
+    blurb: 'A mixed exam spanning all modes: recognition, outlook, Greeks, moneyness, intrinsic value, and break-evens.',
     init: init
   });
 })(window);

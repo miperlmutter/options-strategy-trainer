@@ -33,7 +33,7 @@
     function menu() {
       view.innerHTML = '';
       view.appendChild(h('h1', { text: 'Drills' }));
-      view.appendChild(h('p', { class: 'sub', text: 'Mental-math practice. Read the position, do the arithmetic in your head, type the answer.' }));
+      view.appendChild(h('p', { class: 'sub', text: 'Fast practice. Mental-math sprints (type the answer, beat the clock) plus timed 10-question quizzes on the Greeks and strategy selection — race to finish.' }));
       var grid = h('div', { class: 'grid' });
       grid.appendChild(card(h, 'Box Pricing',
         'Given a box spread\'s four legs and their prices, work out the net cost, what it\'s worth at expiration, or the locked-in profit.',
@@ -47,6 +47,15 @@
       grid.appendChild(card(h, 'Break-even',
         '90-second sprint. Given a strategy\'s legs and per-leg premiums, type the break-even price. Singles are one step; verticals make you net the premiums first.',
         ctx.Store.get('breakeven'), function () { runBreakeven(view, ctx, menu); }));
+      grid.appendChild(card(h, 'Greeks: Identify',
+        'Timed — 10 questions, race the clock. Spot which strategy carries a Greek, and match strategies to their full Δ/Γ/Θ/V profile.',
+        ctx.Store.get('greeks'), function () { launchQuiz(view, ctx, menu, 'greeksIdentify', { title: 'Greeks: Identify', storeKey: 'greeks', blurb: 'Identify which strategy carries a Greek, and match strategies to their full Δ/Γ/Θ/V profile. Ten questions, against the clock.' }); }));
+      grid.appendChild(card(h, 'Greeks: Predict P&L',
+        'Timed — 10 questions. A scenario hits (price, vol, or time); decide whether the position profits, loses, or barely changes.',
+        ctx.Store.get('greeks-predict'), function () { launchQuiz(view, ctx, menu, 'greeksPredict', { title: 'Greeks: Predict the P&L', storeKey: 'greeks-predict', blurb: 'A scenario hits — price moves, vol shifts, or time passes. Decide whether the position profits, loses, or barely changes. Ten questions, against the clock.' }); }));
+      grid.appendChild(card(h, 'Outlook → Strategy',
+        'Timed — 10 questions. Given a market view (direction, volatility, risk appetite), pick the strategy that best fits.',
+        ctx.Store.get('outlook'), function () { launchQuiz(view, ctx, menu, 'outlook', { title: 'Outlook → Strategy', storeKey: 'outlook', blurb: 'Given a market view — direction, volatility, and risk appetite — pick the strategy that best fits. Ten questions, against the clock.' }); }));
       view.appendChild(grid);
     }
     menu();
@@ -56,6 +65,7 @@
     var bits = [];
     if (rec.plays) bits.push(rec.plays + ' play' + (rec.plays > 1 ? 's' : ''));
     if (rec.bestScore != null) bits.push('best ' + rec.bestScore);
+    if (rec.bestTimeMs != null) bits.push('fastest ' + global.Store.fmtTime(rec.bestTimeMs));
     return h('div', { class: 'card', style: 'cursor:pointer', onclick: onclick }, [
       h('div', { class: 'card-head' }, [h('span', { class: 'name', text: title })]),
       h('p', { class: 'sub', style: 'margin:0', text: blurb }),
@@ -719,9 +729,154 @@
     });
   }
 
+  /* ---- timed 10-question MC quiz shell (race the clock; best time saved) ----
+     cfg: { title, blurb, storeKey, make() -> MC question }. Powers the Greeks
+     and Outlook drills, which were converted from pick-a-question-count quizzes
+     to "how fast can you finish 10?" The clock freezes when Q10 is answered. */
+  function runTimedQuiz(view, ctx, back, cfg) {
+    var h = ctx.h;
+    var N = 10;
+    var state = { i: 0, score: 0, streak: 0, correctCount: 0, qs: [], answered: false, startMs: 0, elapsedMs: 0, timerId: null };
+
+    function stopTimer() { if (state.timerId) { clearInterval(state.timerId); state.timerId = null; } }
+    function leave() { stopTimer(); back(); }
+
+    view.innerHTML = '';
+    view.appendChild(h('div', { class: 'row', style: 'margin-bottom:4px' }, [
+      h('button', { class: 'btn ghost', text: '← Drills', onclick: leave })
+    ]));
+    view.appendChild(h('h1', { text: cfg.title }));
+    view.appendChild(h('p', { class: 'sub', text: cfg.blurb }));
+
+    var setup = h('div', { class: 'muted-box', style: 'margin-bottom:16px' });
+    setup.appendChild(h('div', { class: 'row' }, [
+      h('span', { class: 'tag-line', text: 'Race to answer 10 questions — the clock starts when you begin.' }),
+      h('span', { style: 'flex:1' }),
+      h('button', { class: 'btn primary', text: '▶ Start', onclick: start })
+    ]));
+    view.appendChild(setup);
+
+    var hud = h('div', { class: 'row hud', style: 'margin-bottom:12px;display:none' }, [
+      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Time ' }), h('span', { id: 'tq-time', class: 'mono', text: '0.0s' })]),
+      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Q ' }), h('span', { id: 'tq-q', class: 'mono', text: '0/' + N })]),
+      h('span', { class: 'hud-stat' }, [h('span', { class: 'dim', text: 'Correct ' }), h('span', { id: 'tq-correct', class: 'mono', text: '0' })])
+    ]);
+    view.appendChild(hud);
+    var area = h('div');
+    view.appendChild(area);
+
+    function buildQs() {
+      var qs = [], guard = 0;
+      while (qs.length < N && guard < N * 15) { guard++; var q = cfg.make(); if (q) qs.push(q); }
+      return qs;
+    }
+
+    function start() {
+      var qs = buildQs();
+      if (qs.length < N) {
+        hud.style.display = 'none';
+        area.innerHTML = '';
+        area.appendChild(h('div', { class: 'feedback no', text: 'Not enough distinct strategies in your current scope to build 10 questions. Widen your tiers / categories on the Home screen.' }));
+        return;
+      }
+      state.qs = qs; state.i = 0; state.score = 0; state.streak = 0; state.correctCount = 0;
+      state.startMs = Date.now(); state.elapsedMs = 0;
+      hud.style.display = 'flex';
+      stopTimer();
+      state.timerId = setInterval(updateTime, 100);
+      updateTime();
+      renderQ();
+    }
+
+    function updateTime() {
+      var t = document.getElementById('tq-time');
+      if (!t) { stopTimer(); return; }
+      var ms = state.elapsedMs || (Date.now() - state.startMs);
+      t.textContent = (ms / 1000).toFixed(1) + 's';
+    }
+
+    function renderQ() {
+      var q = state.qs[state.i];
+      state.answered = false;
+      area.innerHTML = '';
+      document.getElementById('tq-q').textContent = (state.i + 1) + '/' + N;
+      var card = h('div', { class: 'muted-box' });
+      card.appendChild(h('div', { class: 'q-prompt', text: q.promptText || q.prompt }));
+      if (q.promptMono) card.appendChild(h('div', { class: 'greek-profile-prompt mono', text: q.promptMono }));
+      var optWrap = h('div', { class: 'q-options' });
+      q.options.forEach(function (opt, oi) {
+        optWrap.appendChild(h('button', { class: 'q-opt' + (q.mono ? ' mono' : ''), text: opt, onclick: function () { answer(oi, optWrap, q); } }));
+      });
+      card.appendChild(optWrap);
+      card.appendChild(h('div', { id: 'tq-fb', style: 'margin-top:10px' }));
+      area.appendChild(card);
+    }
+
+    function answer(oi, optWrap, q) {
+      if (state.answered) return;
+      state.answered = true;
+      var correct = oi === q.answer;
+      Array.prototype.forEach.call(optWrap.children, function (b, idx) {
+        b.disabled = true;
+        if (idx === q.answer) b.classList.add('opt-correct');
+        else if (idx === oi) b.classList.add('opt-wrong');
+      });
+      if (correct) { state.streak++; state.score += 10 + (state.streak - 1) * 2; state.correctCount++; } else { state.streak = 0; }
+      document.getElementById('tq-correct').textContent = state.correctCount;
+      var last = state.i === N - 1;
+      if (last) { state.elapsedMs = Date.now() - state.startMs; stopTimer(); updateTime(); }   // freeze the clock at completion
+      var fb = document.getElementById('tq-fb');
+      fb.appendChild(h('div', { class: 'feedback ' + (correct ? 'ok' : 'no'), text: (correct ? '✓ ' : '✗ ') + q.explain }));
+      fb.appendChild(h('button', { class: 'btn primary', style: 'margin-top:8px', text: last ? 'Finish ▸' : 'Next ▸', onclick: function () {
+        state.i++; if (state.i >= N) finish(); else renderQ();
+      } }));
+    }
+
+    function finish() {
+      var rec = ctx.Store.record(cfg.storeKey, { score: state.correctCount, timeMs: state.elapsedMs });
+      area.innerHTML = '';
+      hud.style.display = 'none';
+      var pb = (rec.bestTimeMs === state.elapsedMs) ? ' 🏆 new best time!' : '';
+      area.appendChild(h('div', { class: 'muted-box' }, [
+        h('h2', { text: 'Done — ' + (state.elapsedMs / 1000).toFixed(1) + 's' + pb }),
+        h('p', { class: 'tag-line', text: state.correctCount + ' / ' + N + ' correct · fastest ' + ctx.Store.fmtTime(rec.bestTimeMs) + ' · plays ' + rec.plays }),
+        h('div', { class: 'row' }, [
+          h('button', { class: 'btn primary', text: '▶ Play again', onclick: start }),
+          h('button', { class: 'btn', text: '← Drills', onclick: leave }),
+          h('button', { class: 'btn', text: '⌂ Home', onclick: ctx.home })
+        ])
+      ]));
+    }
+  }
+
+  /* ---- launch a strategy-based timed quiz from the Drills menu (needs ≥4 strategies) ---- */
+  function launchQuiz(view, ctx, back, factoryName, meta) {
+    var h = ctx.h;
+    var DB = global.DrillBank || {};
+    var pool = ctx.strategies;
+    if (!DB[factoryName] || pool.length < 4) {
+      view.innerHTML = '';
+      view.appendChild(h('div', { class: 'row', style: 'margin-bottom:4px' }, [h('button', { class: 'btn ghost', text: '← Drills', onclick: back })]));
+      view.appendChild(h('h1', { text: meta.title }));
+      view.appendChild(h('div', { class: 'muted-box' }, [
+        h('p', { class: 'sub', text: 'This quiz needs at least 4 strategies in your session. Adjust your tiers / categories on the Home screen.' }),
+        h('button', { class: 'btn primary', text: '← Drills', onclick: back })
+      ]));
+      return;
+    }
+    runTimedQuiz(view, ctx, back, { title: meta.title, blurb: meta.blurb, storeKey: meta.storeKey, make: DB[factoryName](pool) });
+  }
+
+  /* ---- publish the numeric generators so Test can reuse them (one source of math) ---- */
+  var DB = global.DrillBank = global.DrillBank || {};
+  DB.moneyness = makeMoneyness;
+  DB.optionValue = makeOption;
+  DB.breakeven = makeBreakeven;
+  DB.box = makeBox;
+
   global.App.registerMode({
     id: 'drills', label: 'Drills', minStrategies: 0,
-    blurb: 'Fast mental-math drills: box pricing, option value, moneyness flash, and break-evens.',
+    blurb: 'Fast practice: mental-math sprints (box pricing, option value, moneyness, break-evens) plus timed 10-question Greeks and Outlook quizzes.',
     init: init
   });
 })(window);
