@@ -571,7 +571,9 @@
   function makeMoneyness() {
     var type = pick(['Call', 'Put']);
     var K = ri(40, 180);
-    var which = pick(['ITM', 'ATM', 'OTM']);
+    // weighted: ITM 40% / OTM 40% / ATM 20% (ATM is the rarer, sharper call)
+    var r = Math.random();
+    var which = r < 0.4 ? 'ITM' : (r < 0.8 ? 'OTM' : 'ATM');
     var S;
     if (which === 'ATM') {
       S = K;                                  // exactly at the strike
