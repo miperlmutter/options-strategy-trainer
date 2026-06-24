@@ -278,7 +278,7 @@
 
     var setup = h('div', { class: 'muted-box', style: 'margin-bottom:16px' });
     setup.appendChild(h('div', { class: 'row' }, [
-      h('span', { class: 'tag-line', text: '90 seconds · type your answer, Enter to submit. Correct answers fly straight to the next; a miss pauses so you can read why.' }),
+      h('span', { class: 'tag-line', text: '90 seconds · type your answer, Enter to submit. Correct answers fly straight to the next; a miss pauses so you can read why. A clean sheet earns a small accuracy bonus.' }),
       h('span', { style: 'flex:1' }),
       h('button', { class: 'btn primary', text: '▶ Start', onclick: start })
     ]));
@@ -410,6 +410,13 @@
       if (!state.running) return;
       state.running = false; state.paused = false;
       stopTimer();
+      // Accuracy factor: number correct is the main driver (10 each), but a clean
+      // sheet should edge out the same count with a miss — add up to +20%, scaled
+      // by hit rate, so 15/15 beats 15/16 while volume still dominates.
+      var accFrac = state.attempted ? state.correct / state.attempted : 0;
+      var accBonus = Math.round(state.score * 0.20 * accFrac);
+      state.score += accBonus;
+      syncHud();
       var rec = ctx.Store.record('option-value', { score: state.score });
       hud.style.display = 'none';
       pausedMsg.style.display = 'none';
@@ -418,7 +425,7 @@
       var best = (rec.bestScore === state.score && state.score > 0) ? ' 🏆 new best!' : '';
       var acc = state.attempted ? Math.round(100 * state.correct / state.attempted) : 0;
       area.appendChild(h('div', { class: 'muted-box' }, [
-        h('h2', { text: 'Time! Score: ' + state.score + best }),
+        h('h2', { text: 'Time! Score: ' + state.score + (accBonus ? ' (incl. +' + accBonus + ' accuracy)' : '') + best }),
         h('p', { class: 'tag-line', text: state.correct + ' correct of ' + state.attempted + ' answered (' + acc + '%) · best ' + (rec.bestScore || state.score) + ' · games played ' + rec.plays }),
         h('div', { class: 'row' }, [
           h('button', { class: 'btn primary', text: '▶ Play again', onclick: start }),
