@@ -51,11 +51,11 @@
         'Answer until you get 10 correct — spot which strategy carries a Greek, and match strategies to their full Δ/Γ/Θ/V profile.',
         ctx.Store.get('greeks'), function () { launchQuiz(view, ctx, menu, 'greeksIdentify', { title: 'Greeks: Identify', storeKey: 'greeks', runner: runUntilCorrect, blurb: 'Spot which strategy carries a Greek, and match strategies to their full Δ/Γ/Θ/V profile. Keep going until you get 10 correct.' }); }));
       grid.appendChild(card(h, 'Greeks: Predict P&L',
-        'Timed — 10 questions. A scenario hits (price, vol, or time); decide whether the position profits, loses, or barely changes.',
-        ctx.Store.get('greeks-predict'), function () { launchQuiz(view, ctx, menu, 'greeksPredict', { title: 'Greeks: Predict the P&L', storeKey: 'greeks-predict', blurb: 'A scenario hits — price moves, vol shifts, or time passes. Decide whether the position profits, loses, or barely changes. Ten questions, against the clock.' }); }));
+        'Answer until you get 10 correct — a scenario hits (price, vol, or time); decide whether the position profits, loses, or barely changes.',
+        ctx.Store.get('greeks-predict'), function () { launchQuiz(view, ctx, menu, 'greeksPredict', { title: 'Greeks: Predict the P&L', storeKey: 'greeks-predict', runner: runUntilCorrect, blurb: 'A scenario hits — price moves, vol shifts, or time passes. Decide whether the position profits, loses, or barely changes. Keep going until you get 10 correct.' }); }));
       grid.appendChild(card(h, 'Outlook → Strategy',
-        'Timed — 10 questions. Given a market view (direction, volatility, risk appetite), pick the strategy that best fits.',
-        ctx.Store.get('outlook'), function () { launchQuiz(view, ctx, menu, 'outlook', { title: 'Outlook → Strategy', storeKey: 'outlook', blurb: 'Given a market view — direction, volatility, and risk appetite — pick the strategy that best fits. Ten questions, against the clock.' }); }));
+        'Answer until you get 10 correct — given a market view (direction, volatility, risk appetite), pick the strategy that best fits.',
+        ctx.Store.get('outlook'), function () { launchQuiz(view, ctx, menu, 'outlook', { title: 'Outlook → Strategy', storeKey: 'outlook', runner: runUntilCorrect, blurb: 'Given a market view — direction, volatility, and risk appetite — pick the strategy that best fits. Keep going until you get 10 correct.' }); }));
       view.appendChild(grid);
     }
     menu();
