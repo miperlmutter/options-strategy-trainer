@@ -66,8 +66,9 @@
     var area = h('div');
     view.appendChild(area);
 
-    function rowEl(rank, r, isMe) {
-      var medal = MEDAL[rank - 1] || '';
+    function rowEl(rank, r, isMe, noMedal) {
+      // medals only in the ranked top-10 list, never on the pinned "your standing" row
+      var medal = (!noMedal && MEDAL[rank - 1]) || '';
       return h('div', { class: 'lb-row' + (isMe ? ' lb-me' : '') }, [
         h('span', { class: 'lb-rank mono', text: medal || String(rank) }),
         h('span', { class: 'lb-name', text: r.nickname }),
@@ -114,11 +115,11 @@
         if (!meInTop) {
           LB.myRow(game, cat).then(function (mine) {
             if (!mine || state.game !== game || state.category !== cat) return;
-            LB.rankOf(game, cat, mine.score).then(function (rank) {
+            LB.rankOf(game, cat, mine.score, mine.created_at).then(function (rank) {
               if (state.game !== game || state.category !== cat) return;
               var wrap = h('div', { class: 'muted-box lb-table', style: 'margin-top:10px' });
               wrap.appendChild(h('div', { class: 'tag-line', style: 'margin-bottom:4px', text: 'Your standing' }));
-              wrap.appendChild(rowEl(rank || '—', mine, true));
+              wrap.appendChild(rowEl(rank || '—', mine, true, true));
               area.appendChild(wrap);
             });
           });

@@ -120,12 +120,20 @@
       .catch(function () { return null; });
   }
 
-  /* ---- read: rank = (# rows with a strictly higher score) + 1 ---- */
-  function rankOf(game, category, score) {
+  /* ---- read: rank = (# rows ranked ahead) + 1 ----
+     "Ahead" must match the board's ordering (score desc, then created_at asc):
+     a higher score, OR the same score set earlier. Counting only strictly-higher
+     scores would give every player tied at the boundary rank 1. createdAt is the
+     player's own row timestamp (from myRow); without it we fall back to score-only. */
+  function rankOf(game, category, score, createdAt) {
     if (!configured()) return Promise.resolve(null);
+    var s = (score | 0);
+    var ahead = createdAt
+      ? 'or=(score.gt.' + s + ',and(score.eq.' + s + ',created_at.lt.' + encodeURIComponent(createdAt) + '))'
+      : 'score=gt.' + s;
     var q = REST + '/scores?game=eq.' + encodeURIComponent(game) +
             '&category=eq.' + encodeURIComponent(category) +
-            '&score=gt.' + (score | 0) + '&select=owner_token';
+            '&' + ahead + '&select=owner_token';
     return fetch(q, { headers: headers({ 'Prefer': 'count=exact', 'Range': '0-0' }) })
       .then(function (r) {
         var cr = r.headers.get('content-range') || '';
