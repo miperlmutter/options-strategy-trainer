@@ -58,7 +58,7 @@
       return;
     }
 
-    view.appendChild(h('p', { class: 'sub', text: 'How everyone stacks up — ranked by score, with accuracy. Each player keeps their top-scoring run and their top 100%-accuracy run. Scores save automatically when you finish a game.' }));
+    view.appendChild(h('p', { class: 'sub', text: 'How everyone stacks up — ranked by score, with accuracy. Each player keeps their run with the most correct answers and their best 100%-accuracy run. Scores save automatically when you finish a game.' }));
 
     var idLine = h('div', { class: 'tag-line', style: 'margin:2px 2px 14px' });
     view.appendChild(idLine);
