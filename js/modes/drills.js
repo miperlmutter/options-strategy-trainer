@@ -27,6 +27,14 @@
   function money(n) { var a = Math.abs(n); return (n < 0 ? '−$' : '$') + (Number.isInteger(a) ? String(a) : a.toFixed(2)); }
   function px(n) { return Number.isInteger(n) ? String(n) : n.toFixed(2); }
   function round2(n) { return Math.round(n * 100) / 100; }
+  // A typed answer of "-" is trader shorthand for "nothing" (zero), so an option
+  // that expires worthless or any zero result can be entered as a dash. En and em
+  // dashes count too; any other non-number stays NaN (treated as "not answered").
+  function parseAns(raw) {
+    var s = (raw == null ? '' : String(raw)).trim();
+    if (s === '-' || s === '–' || s === '—') return 0;
+    return parseFloat(s);
+  }
 
   function init(view, ctx) {
     var h = ctx.h;
@@ -165,7 +173,7 @@
       card.appendChild(legBox);
 
       card.appendChild(h('div', { class: 'q-prompt', style: 'margin-top:14px', text: q.prompt }));
-      var inp = h('input', { class: 'q-input', type: 'number', step: '0.5', placeholder: 'Your answer ($ per share)…', autocomplete: 'off', style: 'max-width:260px' });
+      var inp = h('input', { class: 'q-input', type: 'text', inputmode: 'decimal', placeholder: 'Your answer ($ per share)…', autocomplete: 'off', style: 'max-width:260px' });
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
       card.appendChild(inp);
       var submitBtn = h('button', { class: 'btn primary', style: 'margin-top:12px;display:block', text: 'Submit ▸', onclick: submit });
@@ -176,7 +184,7 @@
 
       function submit() {
         if (state.answered) return;
-        var val = parseFloat(inp.value);
+        var val = parseAns(inp.value);
         if (isNaN(val)) { inp.focus(); return; }
         state.answered = true;
         inp.disabled = true; submitBtn.disabled = true;
@@ -369,7 +377,7 @@
       card.appendChild(posBox);
 
       card.appendChild(h('div', { class: 'q-prompt', style: 'margin-top:14px', text: q.prompt }));
-      var inp = h('input', { class: 'q-input', type: 'number', step: '0.25', placeholder: 'Your answer ($ per share)…', autocomplete: 'off', style: 'max-width:260px' });
+      var inp = h('input', { class: 'q-input', type: 'text', inputmode: 'decimal', placeholder: 'Your answer ($ per share)…', autocomplete: 'off', style: 'max-width:260px' });
       // Enter submits while unanswered; once a miss is showing, Enter advances.
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { if (state.answered) advance(); else submit(); } });
       card.appendChild(inp);
@@ -381,7 +389,7 @@
 
       function submit() {
         if (state.answered || !state.running || state.paused) return;
-        var val = parseFloat(inp.value);
+        var val = parseAns(inp.value);
         if (isNaN(val)) { inp.focus(); return; }
         state.attempted++;
         var correct = Math.abs(val - q.answer) < 0.01;
