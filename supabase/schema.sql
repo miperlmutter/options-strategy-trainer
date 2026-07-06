@@ -132,13 +132,15 @@ begin
 
   v_perfect := (p_attempted > 0 and p_correct = p_attempted);
 
-  -- upsert OVERALL board (keep the max score; keep the winning run's detail)
+  -- upsert the MOST-CORRECT board (category 'overall'): keep the run with the
+  -- most questions correct; break ties by higher score. (Points scoring itself
+  -- is unchanged — this only decides which run is kept/shown.)
   insert into scores (game, category, nickname, owner_token, score, correct, attempted)
   values (p_game, 'overall', p_nickname, p_token, p_score, p_correct, p_attempted)
   on conflict (game, category, owner_token) do update set
-    score     = greatest(scores.score, excluded.score),
-    correct   = case when excluded.score > scores.score then excluded.correct   else scores.correct   end,
-    attempted = case when excluded.score > scores.score then excluded.attempted else scores.attempted end,
+    score     = case when excluded.correct > scores.correct or (excluded.correct = scores.correct and excluded.score > scores.score) then excluded.score     else scores.score     end,
+    correct   = case when excluded.correct > scores.correct or (excluded.correct = scores.correct and excluded.score > scores.score) then excluded.correct   else scores.correct   end,
+    attempted = case when excluded.correct > scores.correct or (excluded.correct = scores.correct and excluded.score > scores.score) then excluded.attempted else scores.attempted end,
     nickname  = excluded.nickname,
     updated_at = now();
 
