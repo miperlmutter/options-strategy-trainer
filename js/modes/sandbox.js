@@ -11,7 +11,8 @@
 (function (global) {
   'use strict';
 
-  function num(v, dflt) { var n = parseFloat(v); return isNaN(n) ? (dflt || 0) : n; }
+  // A comma is accepted as a decimal point ("1,5" == "1.5").
+  function num(v, dflt) { var n = parseFloat(String(v).replace(/,/g, '.')); return isNaN(n) ? (dflt || 0) : n; }
 
   var DEFAULTS = { spot: 100, action: 'buy', type: 'call', strike: 100, premium: 5.00, qty: 1 };
 
@@ -64,7 +65,7 @@
 
     /* ---- stock price + clear ---- */
     var top = h('div', { class: 'muted-box', style: 'margin-bottom:14px' });
-    var spotInp = h('input', { class: 'q-input pairs-input', type: 'number', step: '1', min: '1', value: String(state.spot) });
+    var spotInp = h('input', { class: 'q-input pairs-input', type: 'text', inputmode: 'decimal', value: String(state.spot) });
     spotInp.style.width = '90px';
     spotInp.addEventListener('input', function () { state.spot = num(spotInp.value, DEFAULTS.spot); renderOutput(); });
 
@@ -77,9 +78,9 @@
     /* ---- leg adder ---- */
     var actionSel = sel(['buy', 'sell']);
     var typeSel = sel(['call', 'put', 'stock']);
-    var strikeInp = h('input', { class: 'q-input pairs-input', type: 'number', step: '1', value: String(DEFAULTS.strike), title: 'strike' });
+    var strikeInp = h('input', { class: 'q-input pairs-input', type: 'text', inputmode: 'decimal', value: String(DEFAULTS.strike), title: 'strike' });
     strikeInp.style.width = '80px';
-    var premInp = h('input', { class: 'q-input pairs-input', type: 'number', step: '0.05', value: DEFAULTS.premium.toFixed(2), title: 'premium / share' });
+    var premInp = h('input', { class: 'q-input pairs-input', type: 'text', inputmode: 'decimal', value: DEFAULTS.premium.toFixed(2), title: 'premium / share' });
     premInp.style.width = '120px';
     var qtyInp = h('input', { class: 'q-input pairs-input', type: 'number', min: '1', step: '1', value: String(DEFAULTS.qty), title: 'contracts' });
 

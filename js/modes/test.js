@@ -307,7 +307,7 @@
         card.appendChild(h('div', { class: 'tag-line', text: 'Select every strategy that applies.' }));
 
       } else if (q.kind === 'num') {
-        ninp = h('input', { class: 'q-input', type: 'number', step: '0.25', placeholder: 'Type a dollar amount…', autocomplete: 'off', style: 'max-width:260px' });
+        ninp = h('input', { class: 'q-input', type: 'text', inputmode: 'decimal', placeholder: 'Type a dollar amount…', autocomplete: 'off', style: 'max-width:260px' });
         ninp.value = resp.num || '';
         ninp.addEventListener('keydown', function (e) { if (e.key === 'Enter') goNext(); });
         card.appendChild(ninp);
@@ -337,7 +337,7 @@
       resp = resp || {};
       if (q.kind === 'mc') return resp.mc === q.answer;
       if (q.kind === 'type') return q.accept.indexOf(norm(resp.type || '')) >= 0;
-      if (q.kind === 'num') { var v = parseFloat(resp.num); return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01); }
+      if (q.kind === 'num') { var v = parseFloat(String(resp.num).replace(/,/g, '.')); return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01); }
       if (q.kind === 'sall') {
         for (var i = 0; i < q.options.length; i++) {
           if (!!(resp.sall && resp.sall[i]) !== !!q.options[i].correct) return false;

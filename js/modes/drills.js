@@ -31,7 +31,8 @@
   // that expires worthless or any zero result can be entered as a dash. En and em
   // dashes count too; any other non-number stays NaN (treated as "not answered").
   function parseAns(raw) {
-    var s = (raw == null ? '' : String(raw)).trim();
+    // A comma is accepted as a decimal point ("1,5" == "1.5").
+    var s = (raw == null ? '' : String(raw)).trim().replace(/,/g, '.');
     if (s === '-' || s === '–' || s === '—') return 0;
     return parseFloat(s);
   }
@@ -729,7 +730,7 @@
         legs.innerHTML = q.legs.join('<br>');
         card.appendChild(legs);
         card.appendChild(h('div', { class: 'q-prompt', style: 'margin-top:14px', text: q.prompt }));
-        var inp = h('input', { class: 'q-input', type: 'number', step: '0.5', placeholder: 'Break-even price ($)…', autocomplete: 'off', style: 'max-width:260px' });
+        var inp = h('input', { class: 'q-input', type: 'text', inputmode: 'decimal', placeholder: 'Break-even price ($)…', autocomplete: 'off', style: 'max-width:260px' });
         card.appendChild(inp);
         var submitBtn = h('button', { class: 'btn primary', style: 'margin-top:12px;display:block', text: 'Submit ▸', onclick: submit });
         card.appendChild(submitBtn);
@@ -743,7 +744,7 @@
 
         function submit() {
           if (answered || !api.running() || api.paused()) return;
-          var val = parseFloat(inp.value);
+          var val = parseFloat(String(inp.value).replace(/,/g, '.'));
           if (isNaN(val)) { inp.focus(); return; }
           var ok = Math.abs(val - q.answer) < 0.01;
           if (ok) { api.recordAnswer(true); api.next(); return; }
