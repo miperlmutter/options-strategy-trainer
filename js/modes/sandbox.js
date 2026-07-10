@@ -214,6 +214,7 @@
   global.App.registerMode({
     id: 'sandbox', label: 'Sandbox', minStrategies: 0,
     blurb: 'Live payoff calculator: type real strikes, premiums and quantities and watch the graph update.',
+    noStats: true, cta: 'Open the sandbox →',
     init: init
   });
 })(window);

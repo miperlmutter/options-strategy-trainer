@@ -214,6 +214,7 @@
   global.App.registerMode({
     id: 'build', label: 'Build-a-payoff', minStrategies: 1,
     blurb: 'Given a target graph/outlook, pick legs to construct the strategy; the app draws and checks your result.',
+    noStats: true, cta: 'Build a payoff →',
     init: init
   });
 })(window);
