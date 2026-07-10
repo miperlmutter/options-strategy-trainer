@@ -151,6 +151,7 @@
   global.App.registerMode({
     id: 'flashcards', label: 'Flashcards', minStrategies: 1,
     blurb: 'Flip cards: name on one side; graph, outlook, legs and the "why" on the other. The reference surface.',
+    noStats: true, cta: 'Study the strategies →',
     init: init
   });
 })(window);
