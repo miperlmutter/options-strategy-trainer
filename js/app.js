@@ -135,6 +135,13 @@
       var card = h('div', { class: 'card', style: 'cursor:pointer', onclick: function () { App.go(m.id); } });
       card.appendChild(h('div', { class: 'card-head' }, [ h('span', { class: 'name', text: m.label }) ]));
       card.appendChild(h('p', { class: 'sub', style: 'margin:0', text: m.blurb || '' }));
+      // View-only modes (e.g. the Leaderboard) have nothing to "play", so show a
+      // call-to-action instead of a nonsensical "not played yet" stats line.
+      if (m.noStats) {
+        if (m.cta) card.appendChild(h('div', { class: 'tag-line', style: 'margin-top:10px', text: m.cta }));
+        grid.appendChild(card);
+        return;
+      }
       var bits = [];
       if (m.aggregateKeys) {
         // Drills' stats live under its sub-games' keys — sum their plays for the card.
