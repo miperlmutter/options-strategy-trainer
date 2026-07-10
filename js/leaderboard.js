@@ -257,15 +257,15 @@
     renamePlayer: renamePlayer,
     get lastGame() { return lastGame; },
     GAMES: [
-      { id: 'box-pricing',   label: 'Box Pricing' },
-      { id: 'option-value',  label: 'Option Value' },
+      { id: 'match',         label: 'Match' },
+      { id: 'memory',        label: 'Memory' },
       { id: 'moneyness',     label: 'Moneyness Flash' },
+      { id: 'box-pricing',   label: 'Box Pricing' },
       { id: 'breakeven',     label: 'Break-even' },
+      { id: 'option-value',  label: 'Option Value' },
       { id: 'greeks',        label: 'Greeks: Identify' },
       { id: 'greeks-predict',label: 'Greeks: Predict P&L' },
-      { id: 'outlook',       label: 'Outlook → Strategy' },
-      { id: 'match',         label: 'Match' },
-      { id: 'memory',        label: 'Memory' }
+      { id: 'outlook',       label: 'Outlook → Strategy' }
     ]
   };
 })(window);

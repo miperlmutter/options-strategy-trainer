@@ -50,12 +50,16 @@
     return chosen;
   }
 
-  function init(view, ctx) {
+  function init(view, ctx, back) {
     var h = ctx.h;
     var pool = ctx.strategies;
     var state = { fa: 'graph', fb: 'name', count: Math.min(6, pool.length),
                   first: null, lock: false, moves: 0, miss: 0, matched: 0, total: 0, startMs: 0, timer: null, running: false };
 
+    view.innerHTML = '';
+    view.appendChild(h('div', { class: 'row', style: 'margin-bottom:4px' }, [
+      h('button', { class: 'btn ghost', text: '← Drills', onclick: back })
+    ]));
     view.appendChild(h('h1', { text: 'Memory Match' }));
     view.appendChild(h('p', { class: 'sub', text: 'Concentration: all tiles start face-down. Flip two to find a matching pair (the two facets of the same strategy). Matches stay up; misses flip back. Clear the board in the fewest moves and fastest time.' }));
 
@@ -221,7 +225,8 @@
         h('p', { class: 'tag-line', text: 'Best time ' + ctx.Store.fmtTime(rec.bestTimeMs) + '  ·  Best score ' + (rec.bestScore || score) }),
         h('div', { class: 'row' }, [
           h('button', { class: 'btn primary', text: '▶ Play again', onclick: start }),
-          h('button', { class: 'btn', text: '← Home', onclick: ctx.home })
+          h('button', { class: 'btn', text: '← Drills', onclick: back }),
+          h('button', { class: 'btn', text: '⌂ Home', onclick: ctx.home })
         ])
       ]);
       summary.appendChild(box);
@@ -230,9 +235,9 @@
     }
   }
 
-  global.App.registerMode({
-    id: 'memory', label: 'Memory', minStrategies: 2,
-    blurb: 'Concentration grid: flip face-down tiles to find matching graph↔name pairs from memory.',
-    init: init
-  });
+  // Memory lives inside the Drills tab now (not a top-level mode). Expose its
+  // launcher for drills.js to mount: init(view, ctx, back), where back returns
+  // to the Drills menu.
+  global.DrillGames = global.DrillGames || {};
+  global.DrillGames.memory = init;
 })(window);
