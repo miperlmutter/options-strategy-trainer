@@ -38,16 +38,42 @@
     { name: 'Reversal (Reverse Conversion)', legs: [{ action: 'sell', type: 'stock', strike: 0 }, { action: 'buy', type: 'call', strike: 0 }, { action: 'sell', type: 'put', strike: 0 }] }
   ];
 
-  function recognize(userLegs) {
+  // Gap-equality pattern of the distinct strikes: labels each consecutive gap by
+  // value class (so [10,10] -> "0,0" and [10,15] -> "0,1"). Scale-independent, so
+  // a 5-wide and a 10-wide symmetric butterfly share a pattern while a broken wing
+  // (unequal gaps) differs. Used only to break ties when two library strategies
+  // share the same rank signature (a symmetric butterfly vs a broken-wing one).
+  function gapPattern(legs, strikeOf) {
+    var distinct = legs.map(strikeOf).sort(function (a, b) { return a - b; })
+      .filter(function (v, i, a) { return i === 0 || v !== a[i - 1]; });
+    var lab = {}, n = 0, out = [];
+    for (var i = 1; i < distinct.length; i++) {
+      var g = String(Math.round((distinct[i] - distinct[i - 1]) * 100) / 100);
+      if (!(g in lab)) lab[g] = n++;
+      out.push(lab[g]);
+    }
+    return out.join(',');
+  }
+
+  function recognize(userLegs, spot) {
     if (!userLegs.length) return null;
     var SPOT = global.Payoff.SPOT;
-    var userOf = function (l) { return Math.round((l.strike || 0) * 100) / 100; };
+    // Rank a stock leg at the current stock price, not its typed entry/cost basis,
+    // so a covered call (etc.) is recognized regardless of what you paid for shares.
+    var s0 = (spot == null ? SPOT : spot);
+    var userOf = function (l) { return l.type === 'stock' ? Math.round(s0 * 100) / 100 : Math.round((l.strike || 0) * 100) / 100; };
     var libOf = function (l) { return l.type === 'stock' ? SPOT : SPOT + (l.strike || 0); };
     var us = signature(userLegs, userOf);
 
     var lib = global.StrategyLib.all().filter(function (s) { return !s.timeBased; });
-    for (var i = 0; i < lib.length; i++) {
-      if (signature(lib[i].legs, libOf) === us) return lib[i].name;
+    var matches = lib.filter(function (s) { return signature(s.legs, libOf) === us; });
+    if (matches.length === 1) return matches[0].name;
+    if (matches.length > 1) {
+      // rank signature alone can't tell these apart (e.g. a plain vs broken-wing
+      // butterfly). Refine by the gap-equality pattern; fall back to the first.
+      var userGap = gapPattern(userLegs, userOf);
+      var byGap = matches.filter(function (s) { return gapPattern(s.legs, libOf) === userGap; });
+      return (byGap.length ? byGap[0] : matches[0]).name;
     }
     for (var j = 0; j < SYNTHETICS.length; j++) {
       if (signature(SYNTHETICS[j].legs, libOf) === us) return SYNTHETICS[j].name;
@@ -147,7 +173,7 @@
       outputEl.innerHTML = '';
       if (!state.legs.length) { outputEl.appendChild(h('div', { class: 'tag-line', text: 'Add legs to see the payoff graph.' })); return; }
 
-      var name = recognize(state.legs);
+      var name = recognize(state.legs, state.spot);
       outputEl.appendChild(h('div', { class: 'recognized' + (name ? ' hit' : '') },
         name ? [h('span', { class: 'dim', text: 'Recognized: ' }), h('strong', { text: name })]
              : [h('span', { class: 'dim', text: 'No exact match in the strategy library.' })]));
