@@ -173,7 +173,7 @@
         var mine = (rows || []).filter(function (x) { return x.owner_token === myTok; });
         if (!mine.length) {
           // the post succeeded, so we own at least one row; an empty read means
-          // board() failed or lagged (it returns [] on error) — don't over- or
+          // board() failed or lagged (it returns [] on error), so don't over- or
           // under-claim, just acknowledge the submission went through.
           wrap.appendChild(el('div', { class: 'feedback ok', text: '✓ Sent to the leaderboard as ' + name + '.' }));
           wrap.appendChild(viewLink());
