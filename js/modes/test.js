@@ -337,7 +337,13 @@
       resp = resp || {};
       if (q.kind === 'mc') return resp.mc === q.answer;
       if (q.kind === 'type') return q.accept.indexOf(norm(resp.type || '')) >= 0;
-      if (q.kind === 'num') { var v = parseFloat(String(resp.num).replace(/,/g, '.')); return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01); }
+      if (q.kind === 'num') {
+        // strip a leading "$" and treat a bare "-" (trader shorthand for nothing)
+        // as 0, matching how the Drills games grade these same generators
+        var raw = String(resp.num == null ? '' : resp.num).trim().replace(/^\$/, '').replace(/,/g, '.');
+        var v = (raw === '-' || raw === '–' || raw === '—') ? 0 : parseFloat(raw);
+        return !isNaN(v) && Math.abs(v - q.answer) < (q.tol || 0.01);
+      }
       if (q.kind === 'sall') {
         for (var i = 0; i < q.options.length; i++) {
           if (!!(resp.sall && resp.sall[i]) !== !!q.options[i].correct) return false;

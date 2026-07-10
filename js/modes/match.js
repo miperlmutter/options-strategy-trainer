@@ -214,7 +214,9 @@
 
       if (state.timer) clearInterval(state.timer);
       state.timer = setInterval(function () {
-        if (!state.paused) document.getElementById('m-time').textContent = (elapsedMs() / 1000).toFixed(1) + 's';
+        var t = document.getElementById('m-time');
+        if (!t) { clearInterval(state.timer); state.timer = null; return; }   // navigated away: stop the clock
+        if (!state.paused) t.textContent = (elapsedMs() / 1000).toFixed(1) + 's';
       }, 100);
     }
 

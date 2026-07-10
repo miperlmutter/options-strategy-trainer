@@ -139,8 +139,16 @@
       for (var k = 1; k < xs.length; k++) {
         var y0 = ys[k - 1], y1 = ys[k], s0 = sgn(y0), s1 = sgn(y1);
         if (s0 !== 0 && s1 !== 0 && s0 !== s1) {
+          // clean crossing strictly between two samples
           var t = y0 / (y0 - y1);
           pushBE(bes, xs[k - 1] + t * (xs[k] - xs[k - 1]));
+        } else if (s0 !== 0 && s1 === 0) {
+          // the break-even landed exactly on sample k (a whole-dollar BE often
+          // coincides with a grid point). Confirm it is a real crossing (not a
+          // curve that merely touches zero) by checking the next nonzero sample.
+          var n = k + 1;
+          while (n < xs.length && sgn(ys[n]) === 0) n++;
+          if (n < xs.length && sgn(ys[n]) !== s0) pushBE(bes, xs[k]);
         }
       }
     }
