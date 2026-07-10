@@ -203,6 +203,7 @@
   global.App.registerMode({
     id: 'leaderboard', label: 'Leaderboard', minStrategies: 0,
     blurb: 'See how everyone stacks up — ranked by score, with accuracy.',
+    noStats: true, cta: 'See the standings →',
     init: init
   });
 })(window);
