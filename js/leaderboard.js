@@ -146,12 +146,8 @@
       wrap.innerHTML = '';
       wrap.appendChild(el('div', { class: 'tag-line', text: 'Saving to leaderboard…' }));
       postScore(game, stats, nick).then(function (r) {
+        if (r.ok) { confirmLanded(nick); return; }
         wrap.innerHTML = '';
-        if (r.ok) {
-          wrap.appendChild(el('div', { class: 'feedback ok', text: '✓ Saved to the leaderboard as ' + (nick || getNickname()) + '.' }));
-          wrap.appendChild(viewLink());
-          return;
-        }
         if (r.error === 'name_taken') { ask('That nickname is taken — pick another.'); return; }
         if (r.error === 'invalid_nickname') { ask('Use 2–16 letters, numbers, spaces, _ or -.'); return; }
         var msg = r.error === 'rate_limited' ? 'Too many submissions — wait a moment.'
@@ -162,6 +158,47 @@
         var retry = el('button', { class: 'btn', style: 'margin-top:8px', text: '↻ Try again' });
         retry.onclick = function () { post(nick); };
         wrap.appendChild(retry);
+      });
+    }
+
+    // Every finished run is submitted, but the board only keeps each player's
+    // most-correct run and their best 100% run. Re-read the board and report
+    // "saved" only if THIS run is the one now shown, so a run that didn't beat
+    // your existing best no longer claims it was posted.
+    function confirmLanded(nick) {
+      var name = nick || getNickname();
+      board(game).then(function (rows) {
+        wrap.innerHTML = '';
+        var myTok = token();
+        var mine = (rows || []).filter(function (x) { return x.owner_token === myTok; });
+        if (!mine.length) {
+          // the post succeeded, so we own at least one row; an empty read means
+          // board() failed or lagged (it returns [] on error), so don't over- or
+          // under-claim, just acknowledge the submission went through.
+          wrap.appendChild(el('div', { class: 'feedback ok', text: '✓ Sent to the leaderboard as ' + name + '.' }));
+          wrap.appendChild(viewLink());
+          return;
+        }
+        var landed = mine.some(function (x) {
+          return (x.correct | 0) === (stats.correct | 0)
+              && (x.attempted | 0) === (stats.attempted | 0)
+              && (x.score | 0) === (stats.score | 0);
+        });
+        if (landed) {
+          wrap.appendChild(el('div', { class: 'feedback ok', text: '✓ Saved to the leaderboard as ' + name + '.' }));
+        } else {
+          var top = mine.reduce(function (a, b) {
+            return (!a || b.correct > a.correct || (b.correct === a.correct && b.score > a.score)) ? b : a;
+          }, null);
+          var detail = top ? ' (' + top.correct + '/' + top.attempted + ', ' + top.score + ' pts)' : '';
+          wrap.appendChild(el('div', { class: 'feedback', text: 'Not a new best. Your top run' + detail + ' still stands.' }));
+        }
+        wrap.appendChild(viewLink());
+      }).catch(function () {
+        // couldn't re-read the board; the score was accepted, so acknowledge plainly
+        wrap.innerHTML = '';
+        wrap.appendChild(el('div', { class: 'feedback ok', text: '✓ Sent to the leaderboard as ' + name + '.' }));
+        wrap.appendChild(viewLink());
       });
     }
 

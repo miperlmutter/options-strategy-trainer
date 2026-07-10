@@ -210,7 +210,7 @@
     function finish() {
       var rec = ctx.Store.record('box-pricing', { score: state.score });
       area.innerHTML = '';
-      var best = (rec.bestScore === state.score) ? ' 🏆 new best!' : '';
+      var best = (rec.bestScore === state.score && state.score > 0) ? ' 🏆 new best!' : '';
       var box = h('div', { class: 'muted-box' }, [
         h('h2', { text: 'Final score: ' + state.score + best }),
         h('p', { class: 'tag-line', text: 'Best: ' + (rec.bestScore || state.score) + ' · games played: ' + rec.plays }),
