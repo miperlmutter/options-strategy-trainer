@@ -154,7 +154,11 @@
       updateHud();
 
       if (state.timer) clearInterval(state.timer);
-      state.timer = setInterval(function () { if (!state.paused) document.getElementById('mm-time').textContent = (elapsedMs() / 1000).toFixed(1) + 's'; }, 100);
+      state.timer = setInterval(function () {
+        var t = document.getElementById('mm-time');
+        if (!t) { clearInterval(state.timer); state.timer = null; return; }   // navigated away: stop the clock
+        if (!state.paused) t.textContent = (elapsedMs() / 1000).toFixed(1) + 's';
+      }, 100);
     }
 
     function makeTile(s, facet) {

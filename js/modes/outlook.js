@@ -26,7 +26,6 @@
     for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
     return a;
   }
-  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
   function profileSig(s) { return [s.priceOutlook, s.volOutlook, s.profitPotential, s.risk].join('|'); }
 
   function viewSentence(s) {
@@ -36,13 +35,8 @@
            '. You ' + risk + profit + '. Which strategy best fits?';
   }
 
-  function makeQuestion(pool) {
-    var target = pick(pool);
-    var sig = profileSig(target);
-    // distractors must NOT share the target's full profile (so the answer is unique among the 4)
-    var differ = pool.filter(function (s) { return s.id !== target.id && profileSig(s) !== sig; });
-    var fallback = pool.filter(function (s) { return s.id !== target.id; });
-    var distract = shuffle(differ.length >= 3 ? differ : fallback).slice(0, 3);
+  function build(target, differ) {
+    var distract = shuffle(differ).slice(0, 3);
     var opts = shuffle([target].concat(distract));
     return {
       prompt: viewSentence(target),
@@ -51,6 +45,24 @@
       explain: target.name + ' — ' + target.priceOutlook + ', ' + target.volOutlook +
                ', profit ' + target.profitPotential + ', risk ' + target.risk + '. ' + target.blurb
     };
+  }
+
+  function makeQuestion(pool) {
+    // Every distractor must have a DIFFERENT full profile than the target, since
+    // the prompt is built only from the profile — a same-profile option would be
+    // just as correct. Prefer a target with >=3 such peers (a full 4-option
+    // question); fall back to any target with >=1; give up if the pool is all one
+    // profile (the runner regenerates / widens scope).
+    var order = shuffle(pool);
+    var fallback = null;
+    for (var t = 0; t < order.length; t++) {
+      var target = order[t];
+      var sig = profileSig(target);
+      var differ = pool.filter(function (s) { return s.id !== target.id && profileSig(s) !== sig; });
+      if (differ.length >= 3) return build(target, differ);
+      if (differ.length >= 1 && !fallback) fallback = { target: target, differ: differ };
+    }
+    return fallback ? build(fallback.target, fallback.differ) : null;
   }
 
   var DB = global.DrillBank = global.DrillBank || {};
