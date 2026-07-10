@@ -44,18 +44,24 @@
       view.appendChild(h('h1', { text: 'Drills' }));
       view.appendChild(h('p', { class: 'sub', text: 'Timed practice games to build speed and instinct — beat the clock and your own best score.' }));
       var grid = h('div', { class: 'grid' });
-      grid.appendChild(card(h, 'Box Pricing',
-        'Given a box spread\'s four legs and their prices, work out the net cost, what it\'s worth at expiration, or the locked-in profit.',
-        ctx.Store.get('box-pricing'), function () { runBox(view, ctx, menu); }));
-      grid.appendChild(card(h, 'Option Value',
-        '90-second sprint. One call or put with a strike and the stock price: compute what it\'s worth at expiration — or, if you bought it for a premium, your profit/loss. Answer as many as you can. Awkward dollars, cents in play.',
-        ctx.Store.get('option-value'), function () { runOption(view, ctx, menu); }));
+      grid.appendChild(card(h, 'Match',
+        'Drag-to-pair tiles. Match graphs, names, legs, or outlooks against each other. Beat the clock.',
+        ctx.Store.get('match'), function () { global.DrillGames.match(view, ctx, menu); }));
+      grid.appendChild(card(h, 'Memory',
+        'Concentration grid: flip face-down tiles to find matching graph↔name pairs from memory.',
+        ctx.Store.get('memory'), function () { global.DrillGames.memory(view, ctx, menu); }));
       grid.appendChild(card(h, 'Moneyness Flash',
         '90-second sprint. An option flashes up — call or put, a strike, the stock price. Tap ITM / ATM / OTM (or press 1 / 2 / 3) as fast as you can. Pure recognition reflex.',
         ctx.Store.get('moneyness'), function () { runMoneyness(view, ctx, menu); }));
+      grid.appendChild(card(h, 'Box Pricing',
+        'Given a box spread\'s four legs and their prices, work out the net cost, what it\'s worth at expiration, or the locked-in profit.',
+        ctx.Store.get('box-pricing'), function () { runBox(view, ctx, menu); }));
       grid.appendChild(card(h, 'Break-even',
         '90-second sprint. Given a strategy\'s legs and per-leg premiums, type the break-even price. Singles are one step; verticals make you net the premiums first.',
         ctx.Store.get('breakeven'), function () { runBreakeven(view, ctx, menu); }));
+      grid.appendChild(card(h, 'Option Value',
+        '90-second sprint. One call or put with a strike and the stock price: compute what it\'s worth at expiration — or, if you bought it for a premium, your profit/loss. Answer as many as you can. Awkward dollars, cents in play.',
+        ctx.Store.get('option-value'), function () { runOption(view, ctx, menu); }));
       grid.appendChild(card(h, 'Greeks: Identify',
         'Answer until you get 10 correct — spot which strategy carries a Greek, and match strategies to their full Δ/Γ/Θ/V profile.',
         ctx.Store.get('greeks'), function () { launchQuiz(view, ctx, menu, 'greeksIdentify', { title: 'Greeks: Identify', storeKey: 'greeks', runner: runUntilCorrect, blurb: 'Spot which strategy carries a Greek, and match strategies to their full Δ/Γ/Θ/V profile. Keep going until you get 10 correct.' }); }));
@@ -1056,7 +1062,7 @@
     id: 'drills', label: 'Drills', minStrategies: 0,
     blurb: 'Timed practice games that sharpen the mental math and fast recognition options trading runs on.',
     // the Drills card on Home sums plays across these sub-game store keys
-    aggregateKeys: ['box-pricing', 'option-value', 'moneyness', 'breakeven', 'greeks', 'greeks-predict', 'outlook'],
+    aggregateKeys: ['match', 'memory', 'moneyness', 'box-pricing', 'breakeven', 'option-value', 'greeks', 'greeks-predict', 'outlook'],
     init: init
   });
 })(window);

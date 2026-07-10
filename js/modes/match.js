@@ -84,12 +84,16 @@
     return chosen;
   }
 
-  function init(view, ctx) {
+  function init(view, ctx, back) {
     var h = ctx.h;
     var pool = ctx.strategies;
     var state = { fa: 'graph', fb: 'name', count: Math.min(6, pool.length),
                   startMs: 0, timer: null, score: 0, streak: 0, matched: 0, selected: null, running: false };
 
+    view.innerHTML = '';
+    view.appendChild(h('div', { class: 'row', style: 'margin-bottom:4px' }, [
+      h('button', { class: 'btn ghost', text: '← Drills', onclick: back })
+    ]));
     view.appendChild(h('h1', { text: 'Match' }));
     view.appendChild(h('p', { class: 'sub', text: 'Drag a tile onto its partner — or tap one then the other. Match the two facets you choose. Correct pairs disappear; build a streak and beat your best time.' }));
 
@@ -308,7 +312,8 @@
           '  ·  Best time ' + ctx.Store.fmtTime(rec.bestTimeMs) + '  ·  Best score ' + (rec.bestScore || 0) }),
         h('div', { class: 'row' }, [
           h('button', { class: 'btn primary', text: '▶ Play again', onclick: start }),
-          h('button', { class: 'btn', text: '← Home', onclick: ctx.home })
+          h('button', { class: 'btn', text: '← Drills', onclick: back }),
+          h('button', { class: 'btn', text: '⌂ Home', onclick: ctx.home })
         ])
       ]);
       summary.appendChild(box);
@@ -317,9 +322,9 @@
     }
   }
 
-  global.App.registerMode({
-    id: 'match', label: 'Match', minStrategies: 2,
-    blurb: 'Drag-to-pair tiles. Match graphs, names, legs, or outlooks against each other. Beat the clock.',
-    init: init
-  });
+  // Match lives inside the Drills tab now (not a top-level mode). Expose its
+  // launcher for drills.js to mount: init(view, ctx, back), where back returns
+  // to the Drills menu.
+  global.DrillGames = global.DrillGames || {};
+  global.DrillGames.match = init;
 })(window);
