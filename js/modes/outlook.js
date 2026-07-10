@@ -49,8 +49,8 @@
 
   function makeQuestion(pool) {
     // Every distractor must have a DIFFERENT full profile than the target, since
-    // the prompt is built only from the profile — a same-profile option would be
-    // just as correct. Prefer a target with >=3 such peers (a full 4-option
+    // the prompt is built only from the profile, so a same-profile option would
+    // be just as correct. Prefer a target with >=3 such peers (a full 4-option
     // question); fall back to any target with >=1; give up if the pool is all one
     // profile (the runner regenerates / widens scope).
     var order = shuffle(pool);

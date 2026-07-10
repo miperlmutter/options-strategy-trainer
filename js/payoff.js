@@ -144,8 +144,8 @@
           pushBE(bes, xs[k - 1] + t * (xs[k] - xs[k - 1]));
         } else if (s0 !== 0 && s1 === 0) {
           // the break-even landed exactly on sample k (a whole-dollar BE often
-          // coincides with a grid point). Confirm it's a real crossing — not a
-          // curve that merely touches zero — by checking the next nonzero sample.
+          // coincides with a grid point). Confirm it is a real crossing (not a
+          // curve that merely touches zero) by checking the next nonzero sample.
           var n = k + 1;
           while (n < xs.length && sgn(ys[n]) === 0) n++;
           if (n < xs.length && sgn(ys[n]) !== s0) pushBE(bes, xs[k]);
