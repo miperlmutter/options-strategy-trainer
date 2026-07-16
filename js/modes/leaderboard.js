@@ -33,7 +33,12 @@
     });
     out.sort(function (a, b) {
       var pa = pctNum(a), pb = pctNum(b);
-      if (sortMode === 'acc') {
+      if (sortMode === 'firm') {
+        var fa = (a.firm || '').toLowerCase(), fb = (b.firm || '').toLowerCase();
+        if (!fa !== !fb) return fa ? -1 : 1;          // rows with a firm sort above blanks
+        if (fa !== fb) return fa < fb ? -1 : 1;        // then alphabetical
+        if (b.score !== a.score) return b.score - a.score;   // then by score within a firm
+      } else if (sortMode === 'acc') {
         if (pb !== pa) return pb - pa;
         if (b.score !== a.score) return b.score - a.score;
       } else {
@@ -80,7 +85,7 @@
       refreshBtn
     ]));
     view.appendChild(controls);
-    view.appendChild(h('p', { class: 'tag-line', style: 'margin:-6px 2px 10px', text: 'Click the Score or Acc header to sort.' }));
+    view.appendChild(h('p', { class: 'tag-line', style: 'margin:-6px 2px 10px', text: 'Click the Firm, Score, or Acc header to sort.' }));
 
     var area = h('div');
     view.appendChild(area);
@@ -90,6 +95,7 @@
       return h('div', { class: 'lb-row' + (isMe ? ' lb-me' : '') }, [
         h('span', { class: 'lb-rank mono', text: medal || String(rank) }),
         h('span', { class: 'lb-name', text: r.nickname }),
+        h('span', { class: 'lb-firm dim', text: r.firm || '—' }),
         h('span', { class: 'lb-score mono', text: String(r.score) }),
         h('span', { class: 'lb-detail mono dim', text: r.correct + '/' + r.attempted }),
         h('span', { class: 'lb-pct mono dim', text: pctText(r) })
@@ -108,6 +114,7 @@
       return h('div', { class: 'lb-row lb-head' }, [
         h('span', { class: 'lb-rank', text: '#' }),
         h('span', { class: 'lb-name', text: 'Player' }),
+        head('lb-firm', 'Firm', 'firm'),
         head('lb-score', 'Score', 'score'),
         head('lb-detail', 'Acc', 'acc'),
         h('span', { class: 'lb-pct', text: 'Acc%' })   // readout of Acc, not a separate sort
@@ -167,12 +174,21 @@
       }
       var nick = LB.getNickname();
       if (nick) {
+        var firm = (LB.getFirm && LB.getFirm()) || '';
         idLine.appendChild(h('span', { text: 'Posting as ' }));
         idLine.appendChild(h('span', { class: 'lb-idname', text: nick }));
+        if (firm) {
+          idLine.appendChild(h('span', { text: ' · ' }));
+          idLine.appendChild(h('span', { class: 'lb-idname', text: firm }));
+        }
         idLine.appendChild(h('span', { text: '  ·  ' }));
         var chg = h('span', { class: 'lb-link', text: 'Change name' });
         chg.onclick = promptName;
         idLine.appendChild(chg);
+        idLine.appendChild(h('span', { text: '  ·  ' }));
+        var fm = h('span', { class: 'lb-link', text: firm ? 'Change firm' : 'Add firm' });
+        fm.onclick = promptFirm;
+        idLine.appendChild(fm);
         idLine.appendChild(h('span', { text: '  ·  ' }));
         var rm = h('span', { class: 'lb-link', text: 'Remove me' });
         rm.onclick = confirmRemove;
@@ -199,6 +215,28 @@
       };
       cancel.onclick = renderId;
       idLine.appendChild(yes); idLine.appendChild(cancel); idLine.appendChild(msg);
+    }
+    function promptFirm() {
+      idLine.innerHTML = '';
+      var inp = h('input', { class: 'q-input', type: 'text', maxlength: '24', placeholder: 'Firm (optional, blank to clear)…', autocomplete: 'off', style: 'max-width:240px' });
+      inp.value = (LB.getFirm && LB.getFirm()) || '';
+      var save = h('button', { class: 'btn primary', style: 'margin-left:8px', text: 'Save' });
+      var cancel = h('span', { class: 'lb-link', style: 'margin-left:10px', text: 'cancel' });
+      var msg = h('span', { class: 'tag-line', style: 'margin-left:10px' });
+      function submit() {
+        var v = (inp.value || '').trim();
+        if (v && !/^[A-Za-z0-9 &.,/_-]{1,24}$/.test(v)) { msg.textContent = 'Up to 24 chars: letters, numbers, spaces, & . , / _ -'; return; }
+        save.disabled = true; msg.textContent = 'Saving…';
+        LB.setPlayerFirm(v).then(function (r) {
+          if (r.ok) { renderId(); load(); }
+          else { save.disabled = false; msg.textContent = r.error === 'invalid_firm' ? 'Invalid firm name.' : 'Could not save, try again.'; }
+        });
+      }
+      save.onclick = submit;
+      cancel.onclick = renderId;
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); else if (e.key === 'Escape') renderId(); });
+      idLine.appendChild(inp); idLine.appendChild(save); idLine.appendChild(cancel); idLine.appendChild(msg);
+      inp.focus();
     }
     function promptName() {
       idLine.innerHTML = '';

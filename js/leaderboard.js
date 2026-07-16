@@ -28,6 +28,7 @@
   var NICK_KEY = 'ost:nickname';
   var TOKEN_KEY = 'ost:token';
   var OPTOUT_KEY = 'ost:optout';
+  var FIRM_KEY = 'ost:firm';
 
   function configured() {
     return !!(BASE && KEY && KEY.indexOf('PASTE') === -1);
@@ -56,6 +57,8 @@
   function setNickname(n) { try { localStorage.setItem(NICK_KEY, n); } catch (e) {} }
   function optedOut() { try { return localStorage.getItem(OPTOUT_KEY) === '1'; } catch (e) { return false; } }
   function setOptedOut(v) { try { if (v) localStorage.setItem(OPTOUT_KEY, '1'); else localStorage.removeItem(OPTOUT_KEY); } catch (e) {} }
+  function getFirm() { try { return localStorage.getItem(FIRM_KEY) || ''; } catch (e) { return ''; } }
+  function setFirm(f) { try { if (f) localStorage.setItem(FIRM_KEY, f); else localStorage.removeItem(FIRM_KEY); } catch (e) {} }
 
   // Auto-assigned handle for players who haven't chosen one, so every run lands
   // on the board. Random suffix keeps it unique against the case-insensitive
@@ -76,7 +79,7 @@
     return h;
   }
 
-  var SELECT = 'nickname,score,correct,attempted,created_at,owner_token';
+  var SELECT = 'nickname,firm,score,correct,attempted,created_at,owner_token';
 
   /* ---- normalize a Postgres/PostgREST error into a short code ---- */
   function normalizeErr(msg) {
@@ -84,6 +87,7 @@
     if (msg.indexOf('name_taken') >= 0) return 'name_taken';
     if (msg.indexOf('invalid_nickname') >= 0) return 'invalid_nickname';
     if (msg.indexOf('invalid_score') >= 0 || msg.indexOf('invalid_counts') >= 0) return 'invalid_score';
+    if (msg.indexOf('invalid_firm') >= 0) return 'invalid_firm';
     if (msg.indexOf('invalid_game') >= 0) return 'invalid_game';
     if (msg.indexOf('rate_limited') >= 0) return 'rate_limited';
     return msg || 'error';
@@ -99,7 +103,8 @@
       p_token: token(),
       p_score: stats.score | 0,
       p_correct: stats.correct | 0,
-      p_attempted: stats.attempted | 0
+      p_attempted: stats.attempted | 0,
+      p_firm: getFirm() || null
     };
     return fetch(REST + '/rpc/submit_score', { method: 'POST', headers: headers(), body: JSON.stringify(body) })
       .then(function (res) {
@@ -293,6 +298,24 @@
   }
   function rejoin() { setOptedOut(false); }
 
+  /* ---- set/clear this browser's firm (free text, optional) via set_firm ----
+     Applies to all the player's existing rows and is sent with future scores. ---- */
+  var FIRM_RE = /^[A-Za-z0-9 &.,/_-]{1,24}$/;
+  function setPlayerFirm(firm) {
+    if (!configured()) return Promise.resolve({ ok: false, error: 'not_configured' });
+    var v = (firm || '').trim();
+    if (v && !FIRM_RE.test(v)) return Promise.resolve({ ok: false, error: 'invalid_firm' });
+    return fetch(REST + '/rpc/set_firm', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ p_token: token(), p_firm: v || null })
+    }).then(function (res) {
+      if (res.ok) { setFirm(v); return { ok: true }; }
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        return { ok: false, error: normalizeErr(j && (j.message || j.hint || j.details)) };
+      });
+    }).catch(function () { return { ok: false, error: 'network' }; });
+  }
+
   global.Leaderboard = {
     configured: configured,
     token: token,
@@ -305,6 +328,8 @@
     removeMe: removeMe,
     optedOut: optedOut,
     rejoin: rejoin,
+    getFirm: getFirm,
+    setPlayerFirm: setPlayerFirm,
     get lastGame() { return lastGame; },
     GAMES: [
       { id: 'match',         label: 'Match' },

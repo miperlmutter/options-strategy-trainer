@@ -500,7 +500,7 @@ select option { background: var(--bg-2); color: var(--text); }
 .lb-table { padding: 8px 12px; }
 .lb-row {
   display: grid;
-  grid-template-columns: 44px 1fr 76px 62px 56px;
+  grid-template-columns: 40px 1fr 1fr 72px 58px 52px;
   gap: 8px;
   align-items: center;
   padding: 7px 4px;
@@ -517,6 +517,7 @@ select option { background: var(--bg-2); color: var(--text); }
 .lb-me { background: var(--accent-dim); border-radius: var(--radius); }
 .lb-rank { text-align: center; }
 .lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-firm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .lb-detail, .lb-pct { text-align: right; font-size: 12px; }
 .lb-score { text-align: right; font-weight: 600; color: var(--text); }
 .lb-post .feedback { display: inline-block; }
@@ -527,6 +528,6 @@ select option { background: var(--bg-2); color: var(--text); }
 .lb-link:hover { text-decoration: underline; }
 .lb-idname { color: var(--text); font-weight: 600; }
 @media (max-width: 560px) {
-  .lb-row { grid-template-columns: 36px 1fr 64px 52px; }
-  .lb-detail { display: none; }
+  .lb-row { grid-template-columns: 34px 1fr 1fr 60px 48px; }
+  .lb-detail { display: none; }   /* drop Acc (correct/attempted); firm + Acc% stay */
 }

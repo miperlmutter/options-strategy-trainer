@@ -38,6 +38,7 @@ create table if not exists scores (
   score        int  not null check (score >= 0 and score <= 100000),
   correct      int  not null check (correct >= 0),
   attempted    int  not null check (attempted >= correct),
+  firm         text,        -- optional, free text (validated in the RPCs)
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   constraint scores_game_valid check (game in (
@@ -49,6 +50,8 @@ create table if not exists scores (
 -- fast board reads: top-N by score within a (game, category)
 create index if not exists scores_board_idx
   on scores (game, category, score desc, created_at asc);
+-- firm was added after launch; safe for already-created databases
+alter table scores add column if not exists firm text;
 
 create table if not exists submissions_log (
   id           bigint generated always as identity primary key,
@@ -74,13 +77,17 @@ create policy scores_public_read on scores
 
 -- ---- write path: submit_score() -----------------------------
 
+-- p_firm is optional and defaults to null so older cached clients that omit it
+-- still resolve to this one function (dropping the old 6-arg version first).
+drop function if exists submit_score(text, text, uuid, int, int, int);
 create or replace function submit_score(
   p_game      text,
   p_nickname  text,
   p_token     uuid,
   p_score     int,
   p_correct   int,
-  p_attempted int
+  p_attempted int,
+  p_firm      text default null
 ) returns text
 language plpgsql
 security definer
@@ -90,6 +97,7 @@ declare
   v_owner   uuid;
   v_recent  int;
   v_perfect boolean;
+  v_firm    text := nullif(btrim(coalesce(p_firm, '')), '');
 begin
   -- validate game
   if p_game not in (
@@ -102,6 +110,11 @@ begin
   -- validate nickname: 2-16 chars, letters/numbers/space/underscore/hyphen
   if p_nickname is null or p_nickname !~ '^[A-Za-z0-9 _-]{2,16}$' then
     raise exception 'invalid_nickname';
+  end if;
+
+  -- validate firm: optional; up to 24 chars of a bounded free-text charset
+  if v_firm is not null and v_firm !~ '^[A-Za-z0-9 &.,/_-]{1,24}$' then
+    raise exception 'invalid_firm';
   end if;
 
   -- validate counts + score range
@@ -135,28 +148,50 @@ begin
   -- upsert the MOST-CORRECT board (category 'overall'): keep the run with the
   -- most questions correct; break ties by higher score. (Points scoring itself
   -- is unchanged — this only decides which run is kept/shown.)
-  insert into scores (game, category, nickname, owner_token, score, correct, attempted)
-  values (p_game, 'overall', p_nickname, p_token, p_score, p_correct, p_attempted)
+  insert into scores (game, category, nickname, owner_token, score, correct, attempted, firm)
+  values (p_game, 'overall', p_nickname, p_token, p_score, p_correct, p_attempted, v_firm)
   on conflict (game, category, owner_token) do update set
     score     = case when excluded.correct > scores.correct or (excluded.correct = scores.correct and excluded.score > scores.score) then excluded.score     else scores.score     end,
     correct   = case when excluded.correct > scores.correct or (excluded.correct = scores.correct and excluded.score > scores.score) then excluded.correct   else scores.correct   end,
     attempted = case when excluded.correct > scores.correct or (excluded.correct = scores.correct and excluded.score > scores.score) then excluded.attempted else scores.attempted end,
     nickname  = excluded.nickname,
+    firm      = excluded.firm,
     updated_at = now();
 
   -- upsert PERFECT board only for flawless runs
   if v_perfect then
-    insert into scores (game, category, nickname, owner_token, score, correct, attempted)
-    values (p_game, 'perfect', p_nickname, p_token, p_score, p_correct, p_attempted)
+    insert into scores (game, category, nickname, owner_token, score, correct, attempted, firm)
+    values (p_game, 'perfect', p_nickname, p_token, p_score, p_correct, p_attempted, v_firm)
     on conflict (game, category, owner_token) do update set
       score     = greatest(scores.score, excluded.score),
       correct   = case when excluded.score > scores.score then excluded.correct   else scores.correct   end,
       attempted = case when excluded.score > scores.score then excluded.attempted else scores.attempted end,
       nickname  = excluded.nickname,
+      firm      = excluded.firm,
       updated_at = now();
   end if;
 
   insert into submissions_log (owner_token) values (p_token);
+  return 'ok';
+end;
+$$;
+
+-- ---- write path: set_firm() ---------------------------------
+-- Sets/clears this browser's firm (free text, optional) on all its score rows.
+-- Scoped to the caller-supplied token, same posture as the other write RPCs.
+create or replace function set_firm(p_token uuid, p_firm text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_firm text := nullif(btrim(coalesce(p_firm, '')), '');
+begin
+  if v_firm is not null and v_firm !~ '^[A-Za-z0-9 &.,/_-]{1,24}$' then
+    raise exception 'invalid_firm';
+  end if;
+  update scores set firm = v_firm where owner_token = p_token;
   return 'ok';
 end;
 $$;
@@ -214,12 +249,14 @@ $$;
 -- ---- grants --------------------------------------------------
 -- anon/authenticated may EXECUTE the write functions and SELECT boards, nothing else.
 
-revoke all on function submit_score(text, text, uuid, int, int, int) from public;
+revoke all on function submit_score(text, text, uuid, int, int, int, text) from public;
 revoke all on function rename_player(uuid, text) from public;
 revoke all on function delete_my_scores(uuid) from public;
-grant execute on function submit_score(text, text, uuid, int, int, int) to anon, authenticated;
+revoke all on function set_firm(uuid, text) from public;
+grant execute on function submit_score(text, text, uuid, int, int, int, text) to anon, authenticated;
 grant execute on function rename_player(uuid, text) to anon, authenticated;
 grant execute on function delete_my_scores(uuid) to anon, authenticated;
+grant execute on function set_firm(uuid, text) to anon, authenticated;
 grant select on scores to anon, authenticated;
 
 -- ============================================================
