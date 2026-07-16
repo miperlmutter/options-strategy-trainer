@@ -155,9 +155,16 @@
       });
     }
 
-    // "Posting as X · Change name" line (or a "Set a nickname" prompt if none)
+    // "Posting as X · Change name · Remove me" line (or an opted-out / no-name variant)
     function renderId() {
       idLine.innerHTML = '';
+      if (LB.optedOut && LB.optedOut()) {
+        idLine.appendChild(h('span', { text: 'You’re off the leaderboard.  ' }));
+        var re = h('span', { class: 'lb-link', text: 'Rejoin' });
+        re.onclick = function () { LB.rejoin(); renderId(); load(); };
+        idLine.appendChild(re);
+        return;
+      }
       var nick = LB.getNickname();
       if (nick) {
         idLine.appendChild(h('span', { text: 'Posting as ' }));
@@ -166,12 +173,32 @@
         var chg = h('span', { class: 'lb-link', text: 'Change name' });
         chg.onclick = promptName;
         idLine.appendChild(chg);
+        idLine.appendChild(h('span', { text: '  ·  ' }));
+        var rm = h('span', { class: 'lb-link', text: 'Remove me' });
+        rm.onclick = confirmRemove;
+        idLine.appendChild(rm);
       } else {
-        idLine.appendChild(h('span', { text: 'You’re not on the board yet — scores save automatically once you set a name.  ' }));
-        var set = h('span', { class: 'lb-link', text: 'Set a nickname' });
+        idLine.appendChild(h('span', { text: 'You’re not on the board yet. Play any game and you’re added automatically as a Player-#### you can rename, or  ' }));
+        var set = h('span', { class: 'lb-link', text: 'set a name now' });
         set.onclick = promptName;
         idLine.appendChild(set);
       }
+    }
+    function confirmRemove() {
+      idLine.innerHTML = '';
+      idLine.appendChild(h('span', { text: 'Remove all your scores from the leaderboard? ' }));
+      var yes = h('button', { class: 'btn', style: 'margin-left:6px', text: 'Remove' });
+      var cancel = h('span', { class: 'lb-link', style: 'margin-left:10px', text: 'cancel' });
+      var msg = h('span', { class: 'tag-line', style: 'margin-left:10px' });
+      yes.onclick = function () {
+        yes.disabled = true; msg.textContent = 'Removing…';
+        LB.removeMe().then(function (r) {
+          if (r.ok) { renderId(); load(); }
+          else { yes.disabled = false; msg.textContent = 'Could not remove, try again.'; }
+        });
+      };
+      cancel.onclick = renderId;
+      idLine.appendChild(yes); idLine.appendChild(cancel); idLine.appendChild(msg);
     }
     function promptName() {
       idLine.innerHTML = '';

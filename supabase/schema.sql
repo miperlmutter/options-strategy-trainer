@@ -194,13 +194,32 @@ exception when unique_violation then
 end;
 $$;
 
+-- ---- write path: delete_my_scores() -------------------------
+-- Lets a browser remove its OWN rows from the board ("Remove me"). Scoped to the
+-- caller-supplied token, so it only clears the scores + name claim for that token.
+-- (Anti-abuse posture matches the other RPCs: the token is the only credential.)
+create or replace function delete_my_scores(p_token uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from scores  where owner_token = p_token;
+  delete from players where owner_token = p_token;
+  return 'ok';
+end;
+$$;
+
 -- ---- grants --------------------------------------------------
 -- anon/authenticated may EXECUTE the write functions and SELECT boards, nothing else.
 
 revoke all on function submit_score(text, text, uuid, int, int, int) from public;
 revoke all on function rename_player(uuid, text) from public;
+revoke all on function delete_my_scores(uuid) from public;
 grant execute on function submit_score(text, text, uuid, int, int, int) to anon, authenticated;
 grant execute on function rename_player(uuid, text) to anon, authenticated;
+grant execute on function delete_my_scores(uuid) to anon, authenticated;
 grant select on scores to anon, authenticated;
 
 -- ============================================================
