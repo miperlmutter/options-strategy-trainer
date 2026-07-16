@@ -27,6 +27,7 @@
   var REST = BASE + '/rest/v1';
   var NICK_KEY = 'ost:nickname';
   var TOKEN_KEY = 'ost:token';
+  var OPTOUT_KEY = 'ost:optout';
 
   function configured() {
     return !!(BASE && KEY && KEY.indexOf('PASTE') === -1);
@@ -53,6 +54,21 @@
   }
   function getNickname() { try { return localStorage.getItem(NICK_KEY) || ''; } catch (e) { return ''; } }
   function setNickname(n) { try { localStorage.setItem(NICK_KEY, n); } catch (e) {} }
+  function optedOut() { try { return localStorage.getItem(OPTOUT_KEY) === '1'; } catch (e) { return false; } }
+  function setOptedOut(v) { try { if (v) localStorage.setItem(OPTOUT_KEY, '1'); else localStorage.removeItem(OPTOUT_KEY); } catch (e) {} }
+
+  // Auto-assigned handle for players who haven't chosen one, so every run lands
+  // on the board. Random suffix keeps it unique against the case-insensitive
+  // nickname claim; NOT derived from owner_token (that stays private).
+  function defaultNick() {
+    var chars = 'abcdefghijklmnopqrstuvwxyz0123456789', s = '';
+    var r = new Uint8Array(4);
+    if (global.crypto && global.crypto.getRandomValues) global.crypto.getRandomValues(r);
+    else for (var i = 0; i < 4; i++) r[i] = Math.floor(Math.random() * 256);
+    for (var j = 0; j < 4; j++) s += chars.charAt(r[j] % 36);
+    return 'Player-' + s;
+  }
+  function isDefaultNick(n) { return /^Player-[a-z0-9]{4}$/.test(n || ''); }
 
   function headers(extra) {
     var h = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' };
@@ -127,12 +143,14 @@
   }
 
   // Auto-post a finished run into `container`. stats = {score, correct, attempted}.
-  // If a nickname is set, submits silently and updates the player's best-points
-  // and best-accuracy rows (server keeps the better). If no nickname yet, asks
-  // for one once (then future finishes post automatically). No-op if unconfigured.
+  // Posts under the player's chosen name, or a generated Player-XXXX handle if
+  // they haven't set one, so every run lands on the board; the server keeps the
+  // better of their most-correct and best-100% runs. No-op if unconfigured, or
+  // if the player has opted out via "Remove me".
   function mountResult(container, game, stats) {
     if (!configured()) return;
     lastGame = game;
+    if (optedOut()) return;
     var wrap = el('div', { class: 'lb-post', style: 'margin-top:14px' });
     container.appendChild(wrap);
 
@@ -142,13 +160,19 @@
       return a;
     }
 
-    function post(nick) {
+    // autoTries is a number on the auto-default path (undefined for a chosen name);
+    // on a name clash it regenerates a fresh Player-XXXX instead of prompting.
+    function post(nick, autoTries) {
+      var isAuto = (autoTries != null);
       wrap.innerHTML = '';
       wrap.appendChild(el('div', { class: 'tag-line', text: 'Saving to leaderboard…' }));
       postScore(game, stats, nick).then(function (r) {
         if (r.ok) { confirmLanded(nick); return; }
         wrap.innerHTML = '';
-        if (r.error === 'name_taken') { ask('That nickname is taken — pick another.'); return; }
+        if (r.error === 'name_taken') {
+          if (isAuto && autoTries < 8) { post(defaultNick(), autoTries + 1); return; }   // rare clash: try a fresh handle
+          ask('That nickname is taken — pick another.'); return;
+        }
         if (r.error === 'invalid_nickname') { ask('Use 2–16 letters, numbers, spaces, _ or -.'); return; }
         var msg = r.error === 'rate_limited' ? 'Too many submissions — wait a moment.'
                 : r.error === 'invalid_score' ? 'That score could not be saved.'
@@ -156,7 +180,7 @@
         wrap.appendChild(el('div', { class: 'feedback no', text: '✗ ' + msg }));
         // let a transient failure (network/rate limit) be retried without replaying the game
         var retry = el('button', { class: 'btn', style: 'margin-top:8px', text: '↻ Try again' });
-        retry.onclick = function () { post(nick); };
+        retry.onclick = function () { post(nick, autoTries); };
         wrap.appendChild(retry);
       });
     }
@@ -193,6 +217,12 @@
           var detail = top ? ' (' + top.correct + '/' + top.attempted + ', ' + top.score + ' pts)' : '';
           wrap.appendChild(el('div', { class: 'feedback', text: 'Not a new best. Your top run' + detail + ' still stands.' }));
         }
+        if (isDefaultNick(name)) {
+          // auto-assigned handle: point them at where they can personalize it
+          var chg = el('span', { class: 'lb-link', style: 'display:inline-block;margin-top:8px', text: 'Change name →' });
+          chg.onclick = function () { if (global.App && global.App.go) global.App.go('leaderboard'); };
+          wrap.appendChild(chg);
+        }
         wrap.appendChild(viewLink());
       }).catch(function () {
         // couldn't re-read the board; the score was accepted, so acknowledge plainly
@@ -227,7 +257,7 @@
 
     var nick = getNickname();
     if (nick && NICK_RE.test(nick)) post(nick);
-    else ask();
+    else post(defaultNick(), 0);   // no chosen name yet: auto-post under a generated Player-XXXX
   }
 
   /* ---- change/claim a nickname for this browser's token ---- */
@@ -246,6 +276,23 @@
     }).catch(function () { return { ok: false, error: 'network' }; });
   }
 
+  /* ---- "Remove me": delete this browser's rows and opt out of future auto-posts.
+     Scoped to this browser's own token via the delete_my_scores RPC. Opt-out is
+     only set once the server delete succeeds, so a failure can be retried. ---- */
+  function removeMe() {
+    if (!configured()) { setOptedOut(true); return Promise.resolve({ ok: true }); }
+    return fetch(REST + '/rpc/delete_my_scores', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ p_token: token() })
+    }).then(function (res) {
+      if (res.ok) { setOptedOut(true); return { ok: true }; }
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        return { ok: false, error: normalizeErr(j && (j.message || j.hint || j.details)) };
+      });
+    }).catch(function () { return { ok: false, error: 'network' }; });
+  }
+  function rejoin() { setOptedOut(false); }
+
   global.Leaderboard = {
     configured: configured,
     token: token,
@@ -255,6 +302,9 @@
     board: board,
     mountResult: mountResult,
     renamePlayer: renamePlayer,
+    removeMe: removeMe,
+    optedOut: optedOut,
+    rejoin: rejoin,
     get lastGame() { return lastGame; },
     GAMES: [
       { id: 'match',         label: 'Match' },
