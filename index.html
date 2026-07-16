@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Options Strategy Trainer</title>
-  <link rel="stylesheet" href="css/styles.css?v=42" />
+  <link rel="stylesheet" href="css/styles.css?v=43" />
 </head>
 <body>
   <div class="topbar">
@@ -18,29 +18,29 @@
   </div>
 
   <!-- engine + data  (?v= bumped each deploy to bust the CDN/browser cache) -->
-  <script src="js/payoff.js?v=42"></script>
-  <script src="js/strategies.js?v=42"></script>
-  <script src="js/greeks.js?v=42"></script>
-  <script src="js/storage.js?v=42"></script>
+  <script src="js/payoff.js?v=43"></script>
+  <script src="js/strategies.js?v=43"></script>
+  <script src="js/greeks.js?v=43"></script>
+  <script src="js/storage.js?v=43"></script>
   <!-- leaderboard: public Supabase config + fetch-based client (no SDK/CDN) -->
-  <script src="js/config.js?v=42"></script>
-  <script src="js/leaderboard.js?v=42"></script>
+  <script src="js/config.js?v=43"></script>
+  <script src="js/leaderboard.js?v=43"></script>
   <!-- shell -->
-  <script src="js/app.js?v=42"></script>
+  <script src="js/app.js?v=43"></script>
   <!-- modes: registerMode call order sets the top-nav order (Home is prepended).
        match, memory, greeks & outlook don't register; they feed the Drills tab
        (match/memory as its cards, greeks/outlook via DrillBank), so they load
        first (before drills.js) but stay out of the nav. -->
-  <script src="js/modes/match.js?v=42"></script>
-  <script src="js/modes/memory.js?v=42"></script>
-  <script src="js/modes/greeks.js?v=42"></script>
-  <script src="js/modes/outlook.js?v=42"></script>
-  <script src="js/modes/flashcards.js?v=42"></script>
-  <script src="js/modes/build.js?v=42"></script>
-  <script src="js/modes/sandbox.js?v=42"></script>
-  <script src="js/modes/drills.js?v=42"></script>
-  <script src="js/modes/test.js?v=42"></script>
-  <script src="js/modes/leaderboard.js?v=42"></script>
+  <script src="js/modes/match.js?v=43"></script>
+  <script src="js/modes/memory.js?v=43"></script>
+  <script src="js/modes/greeks.js?v=43"></script>
+  <script src="js/modes/outlook.js?v=43"></script>
+  <script src="js/modes/flashcards.js?v=43"></script>
+  <script src="js/modes/build.js?v=43"></script>
+  <script src="js/modes/sandbox.js?v=43"></script>
+  <script src="js/modes/drills.js?v=43"></script>
+  <script src="js/modes/test.js?v=43"></script>
+  <script src="js/modes/leaderboard.js?v=43"></script>
   <!-- boot -->
   <script>window.addEventListener('DOMContentLoaded', function () { App.boot(); });</script>
 </body>
