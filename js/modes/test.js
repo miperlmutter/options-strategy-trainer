@@ -357,12 +357,14 @@
       var answers = state.qs.map(function (q, i) { return { q: q, correct: grade(q, state.responses[i]) }; });
       var score = answers.filter(function (a) { return a.correct; }).length;
       var total = answers.length;
-      var rec = ctx.Store.record('test', { score: score, total: total });
-      area.innerHTML = '';
       var pct = Math.round(score / total * 100);
+      // Store the grade (%) rather than the raw correct-count: test length is
+      // selectable (5-20 questions), so a bare count isn't comparable run to run.
+      var rec = ctx.Store.record('test', { score: pct });
+      area.innerHTML = '';
       area.appendChild(h('div', { class: 'muted-box' }, [
         h('h2', { text: 'Score: ' + score + ' / ' + total + '  (' + pct + '%)' }),
-        h('p', { class: 'tag-line', text: 'Best score this machine: ' + (rec.bestScore || score) + ' · tests taken: ' + rec.plays }),
+        h('p', { class: 'tag-line', text: 'Best grade this machine: ' + (rec.bestScore != null ? rec.bestScore : pct) + '% · tests taken: ' + rec.plays }),
         review(answers),
         h('div', { class: 'row', style: 'margin-top:8px' }, [
           h('button', { class: 'btn primary', text: '▶ New test', onclick: start }),
@@ -398,6 +400,8 @@
   global.App.registerMode({
     id: 'test', label: 'Test', minStrategies: 4,
     blurb: 'A mixed exam spanning all modes: recognition, outlook, Greeks, moneyness, intrinsic value, and break-evens.',
+    // Test is an exam, not a drill: count runs as "taken", show best as a grade.
+    playNoun: 'taken', scoreUnit: '%', emptyStat: 'not taken yet',
     init: init
   });
 })(window);
