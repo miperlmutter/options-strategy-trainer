@@ -32,6 +32,23 @@
     catch (e) { available = false; mem = obj; }
   }
 
+  // One-time data migrations. Bump SCHEMA and add a step whenever a stored
+  // field changes meaning, so old values are not misread. Runs at load (before
+  // any gameplay writes new data) and stamps db.__schema so each step runs once.
+  var SCHEMA = 1;
+  function migrate() {
+    var db = read();
+    var done = db.__schema || 0;
+    if (done >= SCHEMA) return;
+    // v1: Test switched from storing a raw correct-count to storing a grade (%).
+    // A pre-upgrade test score is a raw count that would render as a bogus "N%",
+    // so clear it; the play count stays valid and "best" restarts under the new unit.
+    if (done < 1 && db.test) { db.test.bestScore = null; db.test.lastScore = null; }
+    db.__schema = SCHEMA;
+    write(db);
+  }
+  migrate();
+
   // Record a result for a mode. Tracks best score and best (lowest) time.
   // result = { score, total, timeMs }  (any field optional)
   function record(mode, result) {

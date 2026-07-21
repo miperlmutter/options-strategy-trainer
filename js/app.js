@@ -149,11 +149,16 @@
         if (totalPlays) bits.push(totalPlays + ' play' + (totalPlays > 1 ? 's' : ''));
       } else {
         var best = Store.get(m.id);
-        if (best.plays) bits.push(best.plays + ' play' + (best.plays > 1 ? 's' : ''));
-        if (best.bestScore != null) bits.push('best ' + best.bestScore);
+        // A mode may relabel its stats (e.g. Test counts runs as "taken" and
+        // shows its best as a "%" grade) via playNoun / scoreUnit / emptyStat.
+        if (best.plays) {
+          bits.push(m.playNoun ? (best.plays + ' ' + m.playNoun)
+                               : (best.plays + ' play' + (best.plays > 1 ? 's' : '')));
+        }
+        if (best.bestScore != null) bits.push('best ' + best.bestScore + (m.scoreUnit || ''));
         if (best.bestTimeMs != null) bits.push('fastest ' + Store.fmtTime(best.bestTimeMs));
       }
-      card.appendChild(h('div', { class: 'tag-line', style: 'margin-top:10px', text: bits.join(' · ') || 'not played yet' }));
+      card.appendChild(h('div', { class: 'tag-line', style: 'margin-top:10px', text: bits.join(' · ') || m.emptyStat || 'not played yet' }));
       grid.appendChild(card);
     });
     v.appendChild(grid);
